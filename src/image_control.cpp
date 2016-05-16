@@ -38,7 +38,7 @@ int main(int argc, char **argv)
 	
 		cvDilate(image_threshold, image_threshold, myModel, 1);
 		cvShowImage("Dilate Image", image_threshold);
-		waitKey(1);
+		waitKey(5);
 
 		percent = find_center(image_threshold,x,y);
 		ROS_INFO("\nX:%f\nY:%f\npercent:%f\n",x,y,percent);
