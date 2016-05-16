@@ -15,6 +15,8 @@ IplImage *image_threshold = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 1);
 Mat image;
 IplImage temp;
 
+geometry_msgs::PoseStamped image_pos;
+
 void imageCallback(const sensor_msgs::Image &image);
 
 int main(int argc, char **argv)
@@ -22,7 +24,7 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "image_control");
 	ros::NodeHandle n;
 	ros::Subscriber image_sub = n.subscribe("/ardrone/bottom/image_raw", 1, imageCallback);
-	ros::Publisher pos_sp = n.advertise<geometry_msgs::PoseStamped>("/image_position_sp", 1);
+	ros::Publisher image_pos_pub = n.advertise<geometry_msgs::PoseStamped>("/image_position", 1);
 	ros::Rate loop_rate(10);
 
 	float percent;
@@ -42,10 +44,13 @@ int main(int argc, char **argv)
 
 		percent = find_center(image_threshold,x,y);
 		ROS_INFO("\nX:%f\nY:%f\npercent:%f\n",x,y,percent);
+		image_pos.pose.position.x = x;
+		image_pos.pose.position.y = y;
+
 
 		//IplImage *image_line = cvCreateImage(cvGetSize(image_threshold),IPL_DEPTH_8U, 1);
 		//edge_extracting(image_threshold, image_line);
-
+		image_pos_pub.publish(image_pos);
 		ros::spinOnce();
 		loop_rate.sleep();
 	}

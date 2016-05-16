@@ -8,17 +8,28 @@
 #define P_pos 0.5f
 #define D_pos 0.01f
 
+#define P_image 0.005f
+#define D_image 0.0001f
+
 using namespace Eigen;
 
 void odometryCallback(const nav_msgs::Odometry &odometry);
 void positionsetpointCallback(const geometry_msgs::PoseStamped &position_setpoint);
+void imagepositionCallback(const geometry_msgs::PoseStamped &msg);
 
 
 bool takeoff = false;
 bool reset_pos = false;
+bool image_update = false;
+
+int image_init_count = 0;
 
 std_msgs::Empty order;
 geometry_msgs::Twist cmd;
+
+Vector3f image_pos(0.0,0.0,0.0);
+Vector3f image_pos_pre(0.0,0.0,0.0);
+Vector3f image_center(320.0,180.0,0.0);
 
 Vector3f pos(0.0,0.0,0.0);
 Vector3f pos_pre(0.0,0.0,0.0);
@@ -31,12 +42,13 @@ int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "position_control");
 	ros::NodeHandle n;
-	ros::Subscriber pos_sub = n.subscribe("/ardrone/odometry", 10, odometryCallback);
-	ros::Subscriber pos_sp_sub = n.subscribe("/position_setpoint", 10, positionsetpointCallback);
-	ros::Publisher cmd_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
-	ros::Publisher takeoff_pub = n.advertise<std_msgs::Empty>("/ardrone/takeoff", 10);
-	ros::Publisher land_pub = n.advertise<std_msgs::Empty>("/ardrone/land", 10);
-	ros::Publisher stop_pub = n.advertise<std_msgs::Empty>("/ardrone/reset", 10);
+	ros::Subscriber pos_sub = n.subscribe("/ardrone/odometry", 1, odometryCallback);
+	ros::Subscriber pos_sp_sub = n.subscribe("/position_setpoint", 1, positionsetpointCallback);
+	ros::Subscriber image_pos_sub = n.subscribe("/image_position", 1, imagepositionCallback);
+	ros::Publisher cmd_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
+	ros::Publisher takeoff_pub = n.advertise<std_msgs::Empty>("/ardrone/takeoff", 1);
+	ros::Publisher land_pub = n.advertise<std_msgs::Empty>("/ardrone/land", 1);
+	ros::Publisher stop_pub = n.advertise<std_msgs::Empty>("/ardrone/reset", 1);
 	ros::Rate loop_rate(20);
 
 	cmd.linear.x = 0.0;
@@ -47,12 +59,26 @@ int main(int argc, char **argv)
 	cmd.angular.z = 0.0;
 	while(ros::ok())
 	{
-		if(reset_pos)
+		// if(reset_pos)
+		// {
+		// 	error = pos_sp - pos;
+		// 	error_d = pos - pos_pre;
+		// 	vel_sp(0) = error(0) * P_pos + error_d(0) * D_pos;
+		// 	vel_sp(1) = error(1) * P_pos + error_d(1) * D_pos;
+		// 	cmd.linear.x = vel_sp(0);
+		// 	cmd.linear.y = vel_sp(1);
+		// 	if(cmd.linear.x > 0.2) cmd.linear.x = 0.2;
+		// 	if(cmd.linear.x < -0.2) cmd.linear.x = -0.2;
+		// 	if(cmd.linear.y > 0.2) cmd.linear.y = 0.2;
+		// 	if(cmd.linear.y < -0.2) cmd.linear.y = -0.2;
+		// }
+
+		if(image_update)
 		{
-			error = pos_sp - pos;
-			error_d = pos - pos_pre;
-			vel_sp(0) = error(0) * P_pos + error_d(0) * D_pos;
-			vel_sp(1) = error(1) * P_pos + error_d(1) * D_pos;
+			error = image_center - image_pos;
+			error = image_pos - image_pos_pre;
+			vel_sp(1) = error(0) * P_image + error_d(0) * D_image;
+			vel_sp(0) = error(1) * P_image + error_d(1) * D_image;
 			cmd.linear.x = vel_sp(0);
 			cmd.linear.y = vel_sp(1);
 			if(cmd.linear.x > 0.2) cmd.linear.x = 0.2;
@@ -60,10 +86,10 @@ int main(int argc, char **argv)
 			if(cmd.linear.y > 0.2) cmd.linear.y = 0.2;
 			if(cmd.linear.y < -0.2) cmd.linear.y = -0.2;
 		}
-			
 		cmd_pub.publish(cmd);
 		ros::spinOnce();
 		loop_rate.sleep();
+		
 	}
 	cmd.linear.x = 0.0;
 	cmd.linear.y = 0.0;
@@ -80,11 +106,6 @@ void odometryCallback(const nav_msgs::Odometry &odometry)
 	pos(0) = odometry.pose.pose.position.x;
 	pos(1) = odometry.pose.pose.position.y;
 	pos(2) = odometry.pose.pose.position.z;
-	if(!reset_pos && pos(2) > 0.3)
-	{
-		pos_sp = pos;
-		reset_pos = true;
-	}
 }
 
 void positionsetpointCallback(const geometry_msgs::PoseStamped &position_setpoint)
@@ -92,4 +113,18 @@ void positionsetpointCallback(const geometry_msgs::PoseStamped &position_setpoin
 	pos_sp(0) = position_setpoint.pose.position.x;
 	pos_sp(1) = position_setpoint.pose.position.y;
 	pos_sp(2) = position_setpoint.pose.position.z;
+}
+
+void imagepositionCallback(const geometry_msgs::PoseStamped &msg)
+{
+	image_pos_pre(0) = image_pos(0);
+	image_pos_pre(1) = image_pos(1);
+	image_pos(0) = msg.pose.position.x;
+	image_pos(1) = msg.pose.position.y;
+
+	if(image_init_count > 5){
+		image_update = true;
+	}else{
+		image_init_count ++;
+	}
 }
