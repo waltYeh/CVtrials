@@ -19,7 +19,14 @@ float Color_Detection(IplImage* src,IplImage* dst,double &xpositon,double& yposi
 	{
 		for(int j = 0; j < hsv_img->width; j++)
 		{
-			if(datafloat[i*step + j*channels + 2]>20&&(datafloat[i*step + j*channels + 1]>0.3)&&(datafloat[i*step + j*channels]>40&&datafloat[i*step + j*channels]<80))
+			if(datafloat[i*step + j*channels + 2]>10&&(datafloat[i*step + j*channels + 1]>0.6)&&(datafloat[i*step + j*channels]>180&&datafloat[i*step + j*channels]<280))
+			{
+				src->imageData[i*(src->widthStep)+j*(src->nChannels)]=0;
+				src->imageData[i*(src->widthStep)+j*(src->nChannels)+1]=0;
+				src->imageData[i*(src->widthStep)+j*(src->nChannels)+2]=0;
+				dst->imageData[i*(dst->widthStep)+j*(dst->nChannels)]=0;
+			}
+			else
 			{
 				src->imageData[i*(src->widthStep)+j*(src->nChannels)]=255;
 				src->imageData[i*(src->widthStep)+j*(src->nChannels)+1]=255;
@@ -28,13 +35,6 @@ float Color_Detection(IplImage* src,IplImage* dst,double &xpositon,double& yposi
 				sum++;
 				xsum+=(j+1);
 				ysum+=(i+1);
-			}
-			else
-			{
-				src->imageData[i*(src->widthStep)+j*(src->nChannels)]=0;
-				src->imageData[i*(src->widthStep)+j*(src->nChannels)+1]=0;
-				src->imageData[i*(src->widthStep)+j*(src->nChannels)+2]=0;
-				dst->imageData[i*(dst->widthStep)+j*(dst->nChannels)]=0;
 			}
 		}
 	}
@@ -211,15 +211,19 @@ void edge_extracting(IplImage* src, IplImage* dst)
 	cvReleaseMemStorage(&storage);
 }
 
-void find_center(IplImage* src, double &x, double &y)
+//Input: 8比特、单通道(二值)图像
+float find_center(IplImage* src, double &x, double &y)
 {
 	int sum=0,xsum=0,ysum=0;
-	float * datafloat = (float *)src->imageData;
+	float percent=0;
+	unsigned char* data=(unsigned char *)src->imageData;  
+	int step = src->widthStep/sizeof(unsigned char);  
+
 	for(int i = 0; i < src->height; i++)
 	{
 		for(int j = 0; j < src->width; j++)
 		{
-			if(datafloat[i + j] > 100)
+			if(data[i*step + j] > 100)
 			{
 				sum++;
 				xsum+=(j+1);
@@ -229,4 +233,6 @@ void find_center(IplImage* src, double &x, double &y)
 	}
 	x = xsum/sum;
 	y = ysum/sum;
+	percent = 1.0 * sum / (src->height * src->width);
+	return percent;
 }
