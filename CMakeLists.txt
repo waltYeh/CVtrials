@@ -46,6 +46,15 @@ target_link_libraries(image_control
   ${OpenCV_LIBS}
 )
 
+add_executable(find_contour 
+  src/find_contour.cpp
+)
+target_link_libraries(find_contour
+  image_process 
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+)
+
 
 
 ## Mark executable scripts (Python etc.) for installation
