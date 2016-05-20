@@ -10,16 +10,17 @@
 using namespace cv;
 using namespace std;
 
-double minarea = 30000; 
+double minarea = 10000 ; 
 float percent;
 double x, y;
 
-IplImage *source_image = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 3);
-IplImage *image_threshold = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 1);
+IplImage *source_image;
+IplImage *source_image_resized = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 3);
+IplImage *counter_image = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 3);
 Mat image;
 IplImage temp;
 
-IplConvKernel * myModel = cvCreateStructuringElementEx(30,30,2,2,CV_SHAPE_RECT);
+IplConvKernel * myModel = cvCreateStructuringElementEx(20,20,2,2,CV_SHAPE_RECT);
 
 geometry_msgs::PoseStamped image_pos;
 
@@ -29,14 +30,12 @@ int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "find_contour");
 	ros::NodeHandle n;
-	ros::Subscriber image_sub = n.subscribe("/ardrone/bottom/image_raw", 1, imageCallback);
+	ros::Subscriber image_sub = n.subscribe("/videofile/image_raw", 1, imageCallback);
 	ros::Publisher image_pub = n.advertise<geometry_msgs::PoseStamped>("/image_position", 1);
-	ros::Rate loop_rate(30);
+	ros::Rate loop_rate(20);
 
 	while(ros::ok())
 	{
-		
-
 		ros::spinOnce();
 		loop_rate.sleep();
 	}
@@ -50,34 +49,53 @@ void imageCallback(const sensor_msgs::Image &msg)
 	cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
 	image = cv_ptr->image;  
+
 	//imshow("Original Image", cv_ptr->image);
 	//waitKey(1);
 	temp = (IplImage)image;
 	source_image = &temp;
-	cvShowImage("Original Image", source_image);
+	cvResize(source_image, source_image_resized);
+	cvShowImage("Original Image", source_image_resized);
 	waitKey(1);
 
-	percent = Color_Detection(source_image, image_threshold, x, y);	
-	cvDilate(image_threshold, image_threshold, myModel, 1);
+	IplImage *image_threshold = cvCreateImage(cvGetSize(source_image_resized),IPL_DEPTH_8U, 1);
+	percent = Color_Detection(source_image_resized, image_threshold, x, y);	
+	
+	//cvDilate(image_threshold, image_threshold, myModel, 1);
+	//cvErode(image_threshold, image_threshold, myModel, 1);
+	
+	
+	cvShowImage("Threshold", image_threshold); 
+	waitKey(1);
 
 	CvMemStorage* storage = cvCreateMemStorage(0);  
 	CvSeq* contour = 0;  
-	cvFindContours(image_threshold, storage, &contour, sizeof(CvContour), CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+	cvFindContours(image_threshold, storage, &contour, sizeof(CvContour), CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
+	cvZero(image_threshold);
 	CvSeq* _contour = contour;  
-
-	for (int iteratorIdx = 0; contour != 0; contour = contour->h_next, iteratorIdx++)  
+	 	 
+	for( ; contour != 0; contour = contour->h_next )
 	{  
-		double tmparea = fabs(cvContourArea(contour));  
-		printf("Area:%f\n", tmparea);
-		if (tmparea < minarea)  
-		{  
-			cvSeqRemove(contour, 0);   
-			continue;  
-		}  
+	 	double tmparea = fabs(cvContourArea(contour));  
+	 	//printf("Area:%f\n", tmparea);
+	 	if (tmparea < minarea)  
+	 	{  
+	 		cvSeqRemove(contour, 0); 
+	 		continue; 
+	 	}  
+		CvRect aRect = cvBoundingRect(contour, 0 );     
+		if ((aRect.width/aRect.height)<0.9 || (aRect.width/aRect.height)> 1.1)    
+		{    
+			cvSeqRemove(contour,0); 
+			continue;    
+		}
+		cvDrawContours(image_threshold, contour, CV_RGB( 255, 255, 255), CV_RGB( 255, 255, 255), -1, 1, 8 );
 	} 
-	contour = _contour;
-	cvDrawContours(image_threshold, contour, CV_RGB(255, 255, 255), CV_RGB(255, 255, 255), 0, 1, 8);  
+	contour = _contour;  
+
+	//printf("Total:%d\n", count);
 	
-	cvShowImage("Contour", image_threshold); 
+	cvShowImage("Contour_image", image_threshold); 
 	waitKey(1);
+	cvReleaseImage(&image_threshold);
 }

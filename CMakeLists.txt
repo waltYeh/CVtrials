@@ -55,6 +55,14 @@ target_link_libraries(find_contour
   ${OpenCV_LIBS}
 )
 
+add_executable(serial_control 
+  src/serial_control.cpp
+)
+target_link_libraries(serial_control
+  ${catkin_LIBRARIES}
+)
+
+
 
 
 ## Mark executable scripts (Python etc.) for installation

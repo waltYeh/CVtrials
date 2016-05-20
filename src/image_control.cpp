@@ -10,10 +10,18 @@
 using namespace cv;
 using namespace std;
 
-IplImage *source_image = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 3);
-IplImage *image_threshold = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 1);
+float percent;
+double x, y;
+
+IplImage *source_image;
+IplImage *source_image_resized = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 3);
+
+//IplImage *source_image = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 3);
+//IplImage *image_threshold = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 1);
 Mat image;
 IplImage temp;
+
+IplConvKernel * myModel = cvCreateStructuringElementEx(10,10,2,2,CV_SHAPE_RECT);
 
 geometry_msgs::PoseStamped image_pos;
 
@@ -23,33 +31,14 @@ int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "image_control");
 	ros::NodeHandle n;
-	ros::Subscriber image_sub = n.subscribe("/ardrone/bottom/image_raw", 1, imageCallback);
+	ros::Subscriber image_sub = n.subscribe("/videofile/image_raw", 1, imageCallback);
 	ros::Publisher image_pos_pub = n.advertise<geometry_msgs::PoseStamped>("/image_position", 1);
-	ros::Rate loop_rate(10);
-
-	float percent;
-	double x, y;
-
-	IplConvKernel * myModel;
-	myModel = cvCreateStructuringElementEx(30,30,2,2,CV_SHAPE_RECT);
+	ros::Rate loop_rate(20);
 
 	while(ros::ok())
-	{
-		percent = Color_Detection(source_image, image_threshold, x, y);
-		//ROS_INFO("\nX:%f\nY:%f\npercent:%f\n",x,y,percent);
-	
-		cvDilate(image_threshold, image_threshold, myModel, 1);
-		cvShowImage("Dilate Image", image_threshold);
-		waitKey(5);
-
-		percent = find_center(image_threshold,x,y);
-		ROS_INFO("\nX:%f\nY:%f\npercent:%f\n",x,y,percent);
+	{	
 		image_pos.pose.position.x = x;
 		image_pos.pose.position.y = y;
-
-
-		//IplImage *image_line = cvCreateImage(cvGetSize(image_threshold),IPL_DEPTH_8U, 1);
-		//edge_extracting(image_threshold, image_line);
 		image_pos_pub.publish(image_pos);
 		ros::spinOnce();
 		loop_rate.sleep();
@@ -68,7 +57,22 @@ void imageCallback(const sensor_msgs::Image &msg)
 	//waitKey(1);
 	temp = (IplImage)image;
 	source_image = &temp;
-	cvShowImage("Original Image", source_image);
+	cvResize(source_image, source_image_resized);
+	cvShowImage("Original Image", source_image_resized);
 	waitKey(1);
+
+	IplImage *image_threshold = cvCreateImage(cvGetSize(source_image_resized),IPL_DEPTH_8U, 1);
+
+	percent = Color_Detection(source_image_resized, image_threshold, x, y);
+	//ROS_INFO("\nX:%f\nY:%f\npercent:%f\n",x,y,percent);
+	//cvErode(image_threshold, image_threshold, myModel, 1);
+	//cvDilate(image_threshold, image_threshold, myModel, 1);
+	cvShowImage("Dilate Image", image_threshold);
+	waitKey(1);
+
+	percent = find_center(image_threshold,x,y);
+	ROS_INFO("\nX:%f\nY:%f\npercent:%f\n",x,y,percent);
+
+	cvReleaseImage(&image_threshold);
 }
 
