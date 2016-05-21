@@ -98,6 +98,7 @@ int main(int argc, char **argv)
 	return 0;
 }
 
+
 void odometryCallback(const nav_msgs::Odometry &odometry)
 {
 	pos_pre(0) = pos(0);

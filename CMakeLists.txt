@@ -30,6 +30,7 @@ catkin_package(
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  include
 )
 
 add_library(image_process
