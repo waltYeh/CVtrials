@@ -26,7 +26,6 @@ private:
 	IplImage *source_image;
 	IplImage *source_image_resized;
 	IplImage *ROI_image;
-	Mat image;
 	IplImage temp;
 	IplConvKernel * myModel;
 	ardrone_control::ROI ROI_msg;
@@ -52,28 +51,24 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 	cv_bridge::CvImage cv_to_ros;
 	cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
-	image = cv_ptr->image;  
-
-	//imshow("Original Image", cv_ptr->image);
-	//waitKey(1);
-	temp = (IplImage)image;
+	temp = (IplImage)(cv_ptr->image);
 	source_image = &temp;
 	cvResize(source_image, source_image_resized);
 	
+	//detect the yellow region
 	IplImage *image_threshold = cvCreateImage(cvGetSize(source_image_resized),IPL_DEPTH_8U, 1);
 	Color_Detection(source_image_resized, image_threshold, x, y);	
 	
 	cvDilate(image_threshold, image_threshold, myModel, 1);
 	//cvErode(image_threshold, image_threshold, myModel, 1);
-	
-	//cvShowImage("Threshold", image_threshold); 
-	//waitKey(1);
 
+	//find the contours
 	CvMemStorage* storage = cvCreateMemStorage(0);  
 	CvSeq* contour = 0;  
 	cvFindContours(image_threshold, storage, &contour, sizeof(CvContour), CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
 	cvZero(image_threshold);
-	CvSeq* _contour = contour;  
+
+	//get rid of the contours which don't meet the requirement
 	int count = 0; 
 	for( ; contour != 0; contour = contour->h_next )
 	{  
@@ -90,25 +85,21 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 			cvSeqRemove(contour,0); 
 			continue;    
 		}
-		
+		//draw the contours
 		cvDrawContours(image_threshold, contour, CV_RGB( 255, 255, 255), CV_RGB( 255, 255, 255), 0, 1, 8 );
+		//find the center of the contours
 		target_image[count][0] = (aRect.x + aRect.x + aRect.width) / 2;
 		target_image[count][1] = (aRect.y + aRect.y + aRect.height) / 2;
-		//ROS_INFO("\nX:%f\nY:%f\n",target_image[count][0],target_image[count][1]);
+		//draw a rectangle of the contour region
 		cvRectangle(image_threshold, cvPoint(target_image[count][0] - 50, target_image[count][1] - 50), cvPoint(target_image[count][0] + 50, target_image[count][1] + 50),CV_RGB(255,255, 255), 1, 8, 0);
 		cvRectangle(source_image_resized, cvPoint(target_image[count][0] - 50, target_image[count][1] - 50), cvPoint(target_image[count][0] + 50, target_image[count][1] + 50),CV_RGB(0,255, 0), 3, 8, 0);
 		count++;
 		
 	} 
-	//ROS_INFO("count num:%d",count);
-
 	cvShowImage("Original Image", source_image_resized);
 	waitKey(1);
-	//cvShowImage("Contour_image", image_threshold); 
-	//waitKey(1);
+
 	ROI_msg.total = count;
-
-
 	for(int i = 0 ; i < count ; i++)
 	{
 		CvRect rect;
@@ -116,12 +107,10 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 		rect.y = target_image[i][1] - 40;
 		rect.width = 80;
 		rect.height = 80;
-
+		//get the ROI region
 		cvSetImageROI(source_image_resized,rect);
 		cvCopy(source_image_resized,ROI_image);  
 		cvResetImageROI(source_image_resized); 
-		//cvShowImage("ROI_image", ROI_image); 
-		//waitKey(1);
 
 		if(i == 0){
 			cv_to_ros.image = ROI_image;
