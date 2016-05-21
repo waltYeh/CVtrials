@@ -45,6 +45,7 @@ float Color_Detection(IplImage* src,IplImage* dst,double &xpositon,double& yposi
 	{
 		xpositon=1.0*xsum/sum;
 		yposition=1.0*ysum/sum;
+		//printf("%d\n", sum);
 	}
 	else
 	{
@@ -101,15 +102,4 @@ float find_center(IplImage* src, double &x, double &y)
 	}
 	
 	return percent;
-}
-
-float New_Color_Detection(const Mat& image, Mat& dst, double &xpositon,double& yposition)
-{
-	int sum=0,xsum=0,ysum=0;
-	float percent=0;
-
-	Mat temp_image;
-	temp_image.create(image.rows, image.cols, CV_8UC3);
-
-	medianBlur(image, temp_image, 5);
 }
