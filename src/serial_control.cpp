@@ -20,13 +20,13 @@ int ret;
 int serial_fd;
 char cmd = 0;
 char read_buf[SIZE];
+bool takeoff = false;
 
 std_msgs::Empty order;
 geometry_msgs::Twist vel_cmd;
 
 int set_serial(int fd, int nSpeed, int nBits, char nEvent, int nStop) ;
 void serial_init();
-
 
 int main(int argc, char **argv)
 {
@@ -50,22 +50,85 @@ int main(int argc, char **argv)
 			ROS_INFO("No data!");
 		}else
 		{
-			//cmd = read_buf[0];
-			// switch(cmd){
-			// 	case 1:
-			// 		break;
-			// 	case 2:
-			// 		break;
-			// 	case 3:
-			// 		break;
-			// 	case 4:
-			// 		break;
-			// 	case 5:
-			// 		break;
-			// 	default:
-			// 		break;
-			// }
-			printf("%c",read_buf[0]); 
+			cmd = read_buf[0];
+			switch(cmd){
+				case 1:
+					cmd.linear.x = 0.1;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case 2:
+					cmd.linear.x = -0.1;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case 3:
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.1;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case 4:
+					cmd.linear.x = 0.0;
+					cmd.linear.y = -0.1;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case 5:
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.1;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case 6:
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = -0.1;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case 7:
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.1;
+					break;
+				case 8:
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = -0.1;
+					break;
+				case 9:
+					if()
+					break;
+				default:
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+			}
+
 
 		}
 

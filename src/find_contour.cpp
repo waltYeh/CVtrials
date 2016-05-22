@@ -57,7 +57,9 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 	
 	//detect the yellow region
 	IplImage *image_threshold = cvCreateImage(cvGetSize(source_image_resized),IPL_DEPTH_8U, 1);
+	IplImage *image_threshold_origin = cvCreateImage(cvGetSize(source_image_resized),IPL_DEPTH_8U, 1);
 	Color_Detection(source_image_resized, image_threshold, x, y);	
+	cvCopy(image_threshold,image_threshold_origin); 
 	
 	cvDilate(image_threshold, image_threshold, myModel, 1);
 	//cvErode(image_threshold, image_threshold, myModel, 1);
@@ -145,6 +147,7 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 	
 	cvReleaseMemStorage(&storage); 
 	cvReleaseImage(&image_threshold);
+	cvReleaseImage(&image_threshold_origin);
 }
 
 
