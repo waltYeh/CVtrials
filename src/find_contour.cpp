@@ -40,7 +40,7 @@ FindContour::FindContour()
 	image_pub = n.advertise<ardrone_control::ROI>("/ROI_image", 1);
 	minarea = 15000;
 	source_image_resized = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 3);
-	ROI_image = cvCreateImage(cvSize(80,80),IPL_DEPTH_8U, 3);
+	ROI_image = cvCreateImage(cvSize(60,60),IPL_DEPTH_8U, 3);
 	myModel = cvCreateStructuringElementEx(20,20,2,2,CV_SHAPE_RECT);
 }
 
@@ -57,9 +57,7 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 	
 	//detect the yellow region
 	IplImage *image_threshold = cvCreateImage(cvGetSize(source_image_resized),IPL_DEPTH_8U, 1);
-	IplImage *image_threshold_origin = cvCreateImage(cvGetSize(source_image_resized),IPL_DEPTH_8U, 1);
 	Color_Detection(source_image_resized, image_threshold, x, y);	
-	cvCopy(image_threshold,image_threshold_origin); 
 	
 	cvDilate(image_threshold, image_threshold, myModel, 1);
 	//cvErode(image_threshold, image_threshold, myModel, 1);
@@ -105,10 +103,10 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 	for(int i = 0 ; i < count ; i++)
 	{
 		CvRect rect;
-		rect.x = target_image[i][0] - 40;
-		rect.y = target_image[i][1] - 40;
-		rect.width = 80;
-		rect.height = 80;
+		rect.x = target_image[i][0] - 30;
+		rect.y = target_image[i][1] - 30;
+		rect.width = 60;
+		rect.height = 60;
 		//get the ROI region
 		cvSetImageROI(source_image_resized,rect);
 		cvCopy(source_image_resized,ROI_image);  
@@ -119,6 +117,8 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 			cv_to_ros.header = cv_ptr->header;
 			cv_to_ros.encoding = sensor_msgs::image_encodings::BGR8;
 			ROI_msg.image1  = *(cv_to_ros.toImageMsg());
+			ROI_msg.pose1.x = target_image[i][0];
+			ROI_msg.pose1.y = target_image[i][1];
 			imshow("test1", cv_to_ros.image);
 			waitKey(1);
 
@@ -129,6 +129,8 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 			cv_to_ros.header = cv_ptr->header;
 			cv_to_ros.encoding = sensor_msgs::image_encodings::BGR8;
 			ROI_msg.image2  = *(cv_to_ros.toImageMsg());
+			ROI_msg.pose2.x = target_image[i][0];
+			ROI_msg.pose2.y = target_image[i][1];
 			imshow("test2", cv_to_ros.image);
 			waitKey(1);
 		}
@@ -138,16 +140,18 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 			cv_to_ros.header = cv_ptr->header;
 			cv_to_ros.encoding = sensor_msgs::image_encodings::BGR8;
 			ROI_msg.image3  = *(cv_to_ros.toImageMsg());
+			ROI_msg.pose3.x = target_image[i][0];
+			ROI_msg.pose3.y = target_image[i][1];
 			imshow("test3", cv_to_ros.image);
 			waitKey(1);
 		}	
 	}
-
-	image_pub.publish(ROI_msg);
+	if(count != 0){
+		image_pub.publish(ROI_msg);
+	}
 	
 	cvReleaseMemStorage(&storage); 
 	cvReleaseImage(&image_threshold);
-	cvReleaseImage(&image_threshold_origin);
 }
 
 

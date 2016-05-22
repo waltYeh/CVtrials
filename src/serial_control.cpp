@@ -51,83 +51,83 @@ int main(int argc, char **argv)
 		}else
 		{
 			cmd = read_buf[0];
-			switch(cmd){
-				case 1:
-					cmd.linear.x = 0.1;
-					cmd.linear.y = 0.0;
-					cmd.linear.z = 0.0;
-					cmd.angular.x = 0.0;
-					cmd.angular.y = 0.0;
-					cmd.angular.z = 0.0;
-					break;
-				case 2:
-					cmd.linear.x = -0.1;
-					cmd.linear.y = 0.0;
-					cmd.linear.z = 0.0;
-					cmd.angular.x = 0.0;
-					cmd.angular.y = 0.0;
-					cmd.angular.z = 0.0;
-					break;
-				case 3:
-					cmd.linear.x = 0.0;
-					cmd.linear.y = 0.1;
-					cmd.linear.z = 0.0;
-					cmd.angular.x = 0.0;
-					cmd.angular.y = 0.0;
-					cmd.angular.z = 0.0;
-					break;
-				case 4:
-					cmd.linear.x = 0.0;
-					cmd.linear.y = -0.1;
-					cmd.linear.z = 0.0;
-					cmd.angular.x = 0.0;
-					cmd.angular.y = 0.0;
-					cmd.angular.z = 0.0;
-					break;
-				case 5:
-					cmd.linear.x = 0.0;
-					cmd.linear.y = 0.0;
-					cmd.linear.z = 0.1;
-					cmd.angular.x = 0.0;
-					cmd.angular.y = 0.0;
-					cmd.angular.z = 0.0;
-					break;
-				case 6:
-					cmd.linear.x = 0.0;
-					cmd.linear.y = 0.0;
-					cmd.linear.z = -0.1;
-					cmd.angular.x = 0.0;
-					cmd.angular.y = 0.0;
-					cmd.angular.z = 0.0;
-					break;
-				case 7:
-					cmd.linear.x = 0.0;
-					cmd.linear.y = 0.0;
-					cmd.linear.z = 0.0;
-					cmd.angular.x = 0.0;
-					cmd.angular.y = 0.0;
-					cmd.angular.z = 0.1;
-					break;
-				case 8:
-					cmd.linear.x = 0.0;
-					cmd.linear.y = 0.0;
-					cmd.linear.z = 0.0;
-					cmd.angular.x = 0.0;
-					cmd.angular.y = 0.0;
-					cmd.angular.z = -0.1;
-					break;
-				case 9:
-					if()
-					break;
-				default:
-					cmd.linear.x = 0.0;
-					cmd.linear.y = 0.0;
-					cmd.linear.z = 0.0;
-					cmd.angular.x = 0.0;
-					cmd.angular.y = 0.0;
-					cmd.angular.z = 0.0;
-					break;
-			}
+			// switch(cmd){
+			// 	case 1:
+			// 		cmd.linear.x = 0.1;
+			// 		cmd.linear.y = 0.0;
+			// 		cmd.linear.z = 0.0;
+			// 		cmd.angular.x = 0.0;
+			// 		cmd.angular.y = 0.0;
+			// 		cmd.angular.z = 0.0;
+			// 		break;
+			// 	case 2:
+			// 		cmd.linear.x = -0.1;
+			// 		cmd.linear.y = 0.0;
+			// 		cmd.linear.z = 0.0;
+			// 		cmd.angular.x = 0.0;
+			// 		cmd.angular.y = 0.0;
+			// 		cmd.angular.z = 0.0;
+			// 		break;
+			// 	case 3:
+			// 		cmd.linear.x = 0.0;
+			// 		cmd.linear.y = 0.1;
+			// 		cmd.linear.z = 0.0;
+			// 		cmd.angular.x = 0.0;
+			// 		cmd.angular.y = 0.0;
+			// 		cmd.angular.z = 0.0;
+			// 		break;
+			// 	case 4:
+			// 		cmd.linear.x = 0.0;
+			// 		cmd.linear.y = -0.1;
+			// 		cmd.linear.z = 0.0;
+			// 		cmd.angular.x = 0.0;
+			// 		cmd.angular.y = 0.0;
+			// 		cmd.angular.z = 0.0;
+			// 		break;
+			// 	case 5:
+			// 		cmd.linear.x = 0.0;
+			// 		cmd.linear.y = 0.0;
+			// 		cmd.linear.z = 0.1;
+			// 		cmd.angular.x = 0.0;
+			// 		cmd.angular.y = 0.0;
+			// 		cmd.angular.z = 0.0;
+			// 		break;
+			// 	case 6:
+			// 		cmd.linear.x = 0.0;
+			// 		cmd.linear.y = 0.0;
+			// 		cmd.linear.z = -0.1;
+			// 		cmd.angular.x = 0.0;
+			// 		cmd.angular.y = 0.0;
+			// 		cmd.angular.z = 0.0;
+			// 		break;
+			// 	case 7:
+			// 		cmd.linear.x = 0.0;
+			// 		cmd.linear.y = 0.0;
+			// 		cmd.linear.z = 0.0;
+			// 		cmd.angular.x = 0.0;
+			// 		cmd.angular.y = 0.0;
+			// 		cmd.angular.z = 0.1;
+			// 		break;
+			// 	case 8:
+			// 		cmd.linear.x = 0.0;
+			// 		cmd.linear.y = 0.0;
+			// 		cmd.linear.z = 0.0;
+			// 		cmd.angular.x = 0.0;
+			// 		cmd.angular.y = 0.0;
+			// 		cmd.angular.z = -0.1;
+			// 		break;
+			// 	case 9:
+			// 		if()
+			// 		break;
+			// 	default:
+			// 		cmd.linear.x = 0.0;
+			// 		cmd.linear.y = 0.0;
+			// 		cmd.linear.z = 0.0;
+			// 		cmd.angular.x = 0.0;
+			// 		cmd.angular.y = 0.0;
+			// 		cmd.angular.z = 0.0;
+			// 		break;
+			//}
 
 
 		}

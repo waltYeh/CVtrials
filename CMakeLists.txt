@@ -16,12 +16,14 @@ find_package(OpenCV REQUIRED)
 add_message_files(
   FILES
   ROI.msg
+  ROINumber.msg
 )
 
 generate_messages(
   DEPENDENCIES
   std_msgs
   sensor_msgs
+  geometry_msgs
 )
 
 catkin_package(
