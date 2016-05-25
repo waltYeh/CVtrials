@@ -57,6 +57,42 @@ float Color_Detection(IplImage* src,IplImage* dst,double &xpositon,double& yposi
 	return percent;
 }
 
+void Number_Detection(IplImage* src,IplImage* dst)
+{
+	cvSmooth(src,src,CV_MEDIAN,5,5);
+	IplImage *src_float = cvCreateImage(cvGetSize(src),IPL_DEPTH_32F, 3);
+	cvConvertScale(src, src_float, 1.0, 0.0);
+	IplImage *hsv_img = cvCreateImage(cvGetSize(src), IPL_DEPTH_32F , 3);
+	cvCvtColor(src_float, hsv_img, CV_BGR2HSV);
+	int step = hsv_img->widthStep/sizeof(float);
+	int channels = hsv_img->nChannels;
+	float * datafloat = (float *)hsv_img->imageData;
+	for(int i = 0; i < hsv_img->height; i++)
+	{
+		for(int j = 0; j < hsv_img->width; j++)
+		{
+			//if(datafloat[i*step + j*channels + 2]>10&&(datafloat[i*step + j*channels + 1]>0.1)&&(datafloat[i*step + j*channels]>130&&datafloat[i*step + j*channels]<310))
+			if((datafloat[i*step + j*channels]>10&&datafloat[i*step + j*channels]<90))
+			{
+				// src->imageData[i*(src->widthStep)+j*(src->nChannels)]=255;
+				// src->imageData[i*(src->widthStep)+j*(src->nChannels)+1]=255;
+				// src->imageData[i*(src->widthStep)+j*(src->nChannels)+2]=255;
+				dst->imageData[i*(dst->widthStep)+j*(dst->nChannels)]=255;
+			}
+			else
+			{
+				// src->imageData[i*(src->widthStep)+j*(src->nChannels)]=0;
+				// src->imageData[i*(src->widthStep)+j*(src->nChannels)+1]=0;
+				// src->imageData[i*(src->widthStep)+j*(src->nChannels)+2]=0;
+				dst->imageData[i*(dst->widthStep)+j*(dst->nChannels)]=0;
+			}
+		}
+	}
+
+	cvReleaseImage(&hsv_img);
+	cvReleaseImage(&src_float);
+}
+
 //Input: 8比特、单通道(二值)图像
 void edge_extracting(IplImage* src, IplImage* dst)
 {

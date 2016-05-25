@@ -9,7 +9,7 @@
 #define D_pos 0.01f
 
 #define P_image 0.005f
-#define D_image 0.0001f
+#define D_image 0.0000f
 
 using namespace Eigen;
 
@@ -76,9 +76,9 @@ int main(int argc, char **argv)
 		if(image_update)
 		{
 			error = image_center - image_pos;
-			error = image_pos - image_pos_pre;
-			vel_sp(1) = error(0) * P_image + error_d(0) * D_image;
-			vel_sp(0) = error(1) * P_image + error_d(1) * D_image;
+			//error = image_pos - image_pos_pre;
+			vel_sp(1) = error(0) * P_image;// + error_d(0) * D_image;
+			vel_sp(0) = error(1) * P_image;// + error_d(1) * D_image;
 			cmd.linear.x = vel_sp(0);
 			cmd.linear.y = vel_sp(1);
 			if(cmd.linear.x > 0.2) cmd.linear.x = 0.2;

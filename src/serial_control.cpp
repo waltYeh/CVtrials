@@ -12,18 +12,18 @@
 #include <errno.h>
 
 
-#define BAUDRATE 	B57600
+#define BAUDRATE 	57600
 #define DEVICE 	"/dev/ttyUSB0"  
-#define SIZE 100
+#define SIZE 20
 
 int ret;
 int serial_fd;
-char cmd = 0;
+char cmd_recieved = 0;
 char read_buf[SIZE];
 bool takeoff = false;
 
 std_msgs::Empty order;
-geometry_msgs::Twist vel_cmd;
+geometry_msgs::Twist cmd;
 
 int set_serial(int fd, int nSpeed, int nBits, char nEvent, int nStop) ;
 void serial_init();
@@ -35,11 +35,17 @@ int main(int argc, char **argv)
 	ros::Publisher cmd_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
 	ros::Publisher takeoff_pub = n.advertise<std_msgs::Empty>("/ardrone/takeoff", 1);
 	ros::Publisher land_pub = n.advertise<std_msgs::Empty>("/ardrone/land", 1);
-	ros::Rate loop_rate(50);
+	ros::Rate loop_rate(10);
 
 	serial_init();
 	while(ros::ok())
 	{
+		cmd.linear.x = 0.0;
+		cmd.linear.y = 0.0;
+		cmd.linear.z = 0.0;
+		cmd.angular.x = 0.0;
+		cmd.angular.y = 0.0;
+		cmd.angular.z = 0.0;
 		memset(read_buf,0,SIZE);
 		ret = read(serial_fd, read_buf, 1);
 		if(ret < 0)
@@ -50,87 +56,103 @@ int main(int argc, char **argv)
 			ROS_INFO("No data!");
 		}else
 		{
-			cmd = read_buf[0];
-			// switch(cmd){
-			// 	case 1:
-			// 		cmd.linear.x = 0.1;
-			// 		cmd.linear.y = 0.0;
-			// 		cmd.linear.z = 0.0;
-			// 		cmd.angular.x = 0.0;
-			// 		cmd.angular.y = 0.0;
-			// 		cmd.angular.z = 0.0;
-			// 		break;
-			// 	case 2:
-			// 		cmd.linear.x = -0.1;
-			// 		cmd.linear.y = 0.0;
-			// 		cmd.linear.z = 0.0;
-			// 		cmd.angular.x = 0.0;
-			// 		cmd.angular.y = 0.0;
-			// 		cmd.angular.z = 0.0;
-			// 		break;
-			// 	case 3:
-			// 		cmd.linear.x = 0.0;
-			// 		cmd.linear.y = 0.1;
-			// 		cmd.linear.z = 0.0;
-			// 		cmd.angular.x = 0.0;
-			// 		cmd.angular.y = 0.0;
-			// 		cmd.angular.z = 0.0;
-			// 		break;
-			// 	case 4:
-			// 		cmd.linear.x = 0.0;
-			// 		cmd.linear.y = -0.1;
-			// 		cmd.linear.z = 0.0;
-			// 		cmd.angular.x = 0.0;
-			// 		cmd.angular.y = 0.0;
-			// 		cmd.angular.z = 0.0;
-			// 		break;
-			// 	case 5:
-			// 		cmd.linear.x = 0.0;
-			// 		cmd.linear.y = 0.0;
-			// 		cmd.linear.z = 0.1;
-			// 		cmd.angular.x = 0.0;
-			// 		cmd.angular.y = 0.0;
-			// 		cmd.angular.z = 0.0;
-			// 		break;
-			// 	case 6:
-			// 		cmd.linear.x = 0.0;
-			// 		cmd.linear.y = 0.0;
-			// 		cmd.linear.z = -0.1;
-			// 		cmd.angular.x = 0.0;
-			// 		cmd.angular.y = 0.0;
-			// 		cmd.angular.z = 0.0;
-			// 		break;
-			// 	case 7:
-			// 		cmd.linear.x = 0.0;
-			// 		cmd.linear.y = 0.0;
-			// 		cmd.linear.z = 0.0;
-			// 		cmd.angular.x = 0.0;
-			// 		cmd.angular.y = 0.0;
-			// 		cmd.angular.z = 0.1;
-			// 		break;
-			// 	case 8:
-			// 		cmd.linear.x = 0.0;
-			// 		cmd.linear.y = 0.0;
-			// 		cmd.linear.z = 0.0;
-			// 		cmd.angular.x = 0.0;
-			// 		cmd.angular.y = 0.0;
-			// 		cmd.angular.z = -0.1;
-			// 		break;
-			// 	case 9:
-			// 		if()
-			// 		break;
-			// 	default:
-			// 		cmd.linear.x = 0.0;
-			// 		cmd.linear.y = 0.0;
-			// 		cmd.linear.z = 0.0;
-			// 		cmd.angular.x = 0.0;
-			// 		cmd.angular.y = 0.0;
-			// 		cmd.angular.z = 0.0;
-			// 		break;
-			//}
+			cmd_recieved = read_buf[0];
+			
+			switch(cmd_recieved){
+				case '0':
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case '1':
+					cmd.linear.x = 0.1;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case '2':
+					cmd.linear.x = -0.1;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case '3':
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.1;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case '4':
+					cmd.linear.x = 0.0;
+					cmd.linear.y = -0.1;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case '5':
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.1;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case '6':
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = -0.1;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+				case '7':
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.1;
+					break;
+				case '8':
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = -0.1;
+					break;
+				case '9':
+					if(!takeoff){
+						takeoff_pub.publish(order);
+						takeoff = true;
+					}else{
+						land_pub.publish(order);
+						takeoff = false;
+					}
+					break;
+				default:
+					cmd.linear.x = 0.0;
+					cmd.linear.y = 0.0;
+					cmd.linear.z = 0.0;
+					cmd.angular.x = 0.0;
+					cmd.angular.y = 0.0;
+					cmd.angular.z = 0.0;
+					break;
+			}
 
 
 		}
+		cmd_pub.publish(cmd);
 
 		ros::spinOnce();
 		loop_rate.sleep();

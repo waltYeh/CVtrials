@@ -87,7 +87,7 @@ void odometryCallback(const nav_msgs::Odometry &odometry)
 
 bool near_bool(float x, float y)
 {
-	if(fabsf( x - y ) <  0.3)
+	if(fabsf( x - y ) <  1.0)
 		return true;
 	else return false;
 }

@@ -12,6 +12,7 @@ using namespace std;
 
 float percent;
 double x, y;
+double target_image[10][2];
 
 IplImage *source_image;
 IplImage *source_image_resized = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 3);
@@ -31,7 +32,7 @@ int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "image_control");
 	ros::NodeHandle n;
-	ros::Subscriber image_sub = n.subscribe("/videofile/image_raw", 1, imageCallback);
+	ros::Subscriber image_sub = n.subscribe("/ardrone/bottom/image_raw", 1, imageCallback);
 	ros::Publisher image_pos_pub = n.advertise<geometry_msgs::PoseStamped>("/image_position", 1);
 	ros::Rate loop_rate(20);
 
@@ -53,13 +54,9 @@ void imageCallback(const sensor_msgs::Image &msg)
 	cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
 	image = cv_ptr->image;  
-	//imshow("Original Image", cv_ptr->image);
-	//waitKey(1);
 	temp = (IplImage)image;
 	source_image = &temp;
 	cvResize(source_image, source_image_resized);
-	cvShowImage("Original Image", source_image_resized);
-	waitKey(1);
 
 	IplImage *image_threshold = cvCreateImage(cvGetSize(source_image_resized),IPL_DEPTH_8U, 1);
 
@@ -67,11 +64,43 @@ void imageCallback(const sensor_msgs::Image &msg)
 	//ROS_INFO("\nX:%f\nY:%f\npercent:%f\n",x,y,percent);
 	//cvErode(image_threshold, image_threshold, myModel, 1);
 	//cvDilate(image_threshold, image_threshold, myModel, 1);
-	cvShowImage("Dilate Image", image_threshold);
-	waitKey(1);
+	cvDilate(image_threshold, image_threshold, myModel, 1);
 
-	percent = find_center(image_threshold,x,y);
-	ROS_INFO("\nX:%f\nY:%f\npercent:%f\n",x,y,percent);
+	CvMemStorage* storage = cvCreateMemStorage(0);  
+	CvSeq* contour = 0;  
+	cvFindContours(image_threshold, storage, &contour, sizeof(CvContour), CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+	cvZero(image_threshold);
+
+	//get rid of the contours which don't meet the requirement
+	int count = 0; 
+	for( ; contour != 0; contour = contour->h_next )
+	{  
+	 	double tmparea = fabs(cvContourArea(contour));  
+	 	printf("Area:%f\n", tmparea);
+	 	if (tmparea < 1000)  
+	 	{  
+	 		cvSeqRemove(contour, 0); 
+	 		continue; 
+	 	}  
+		CvRect aRect = cvBoundingRect(contour, 0 );
+		if ((aRect.width/aRect.height)<0.8 || (aRect.width/aRect.height)> 1.2)    
+		{    
+			cvSeqRemove(contour,0); 
+			continue;    
+		}
+		//draw the contours
+		cvDrawContours(image_threshold, contour, CV_RGB( 255, 255, 255), CV_RGB( 255, 255, 255), 0, 1, 8 );
+		//find the center of the contours
+		target_image[count][0] = (aRect.x + aRect.x + aRect.width) / 2;
+		target_image[count][1] = (aRect.y + aRect.y + aRect.height) / 2;
+		//draw a rectangle of the contour region
+		cvRectangle(image_threshold, cvPoint(target_image[count][0] - 50, target_image[count][1] - 50), cvPoint(target_image[count][0] + 50, target_image[count][1] + 50),CV_RGB(255,255, 255), 1, 8, 0);
+		cvRectangle(source_image_resized, cvPoint(target_image[count][0] - 50, target_image[count][1] - 50), cvPoint(target_image[count][0] + 50, target_image[count][1] + 50),CV_RGB(0,255, 0), 3, 8, 0);
+		count++;
+		
+	} 
+	cvShowImage("Original Image", source_image_resized);
+	waitKey(1);
 
 	cvReleaseImage(&image_threshold);
 }
