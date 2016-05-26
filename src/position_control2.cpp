@@ -67,6 +67,8 @@ public:
 	void get_R_body(float yaw);
 	States();
 	~States();
+	void inertial_filter_predict(float dt, float x[2], float acc);
+	void inertial_filter_correct(float e, float dt, float x[2], char i, float w);
 private:
 	ros::NodeHandle n;
 	ros::Subscriber states_sub;
@@ -234,6 +236,19 @@ void States::get_R_body(float yaw)
 	R_body(2,1) = 0;
 	R_body(2,2) = 0;
 }
+void States::inertial_filter_predict(float dt, float x[2], float acc)
+{
+	x[0] += x[1] * dt + 0.5 * acc * dt * dt;
+	x[1] = acc * dt;
+}
+void States::inertial_filter_correct(float e, float dt, float x[2], char i, float w)
+{
+	float ewdt = e * w * dt;
+	x[i] += ewdt;
+	if (i == 0){
+		x[1] += w * ewdt;
+	}
+}
 Vector3f pos(0.0,0.0,0.0);
 
 Vector3f image_pos(0.0,0.0,0.0);
@@ -264,12 +279,46 @@ void States::odometryCallback(const nav_msgs::Odometry &odometry)
 }
 void States::navCallback(const ardrone_autonomy::Navdata &msg)
 {
-	vel_b(0) = msg.
-	vel_b(1) = 
-	vel_b(2) = 
+	Vector3f raw_v = ;
+	Vector3f raw_a = ;
+	acc_b = raw_a;
+
+	pos_i += raw_v * dt;
+
 	yaw = (msg.rotZ+80) / 57.3;
 	first_yaw_received = true;
 //	ROS_INFO("yaw_deg: %f",yaw*57.3);
+	float x[2], y[2], z[2];
+	x[0] = pos_b(0);
+	y[0] = pos_b(1);
+	z[0] = pos_b(2);
+	x[1] = vel_b(0);
+	y[1] = vel_b(1);
+	z[1] = vel_b(2);
+
+	inertial_filter_predict(dt, x, acc_b(0));
+	inertial_filter_predict(dt, y, acc_b(1));
+	inertial_filter_predict(dt, z, acc_b(2));
+	float ex = pos_i(0) - x[0];
+	float ey = pos_i(1) - y[0];
+	float ez = pos_i(2) - z[0];
+	#define WEIGHT_P 0.8
+	#define WEIGHT_V 0.8
+	inertial_filter_correct(ex, dt, x, 0, WEIGHT_P);
+	inertial_filter_correct(ey, dt, y, 0, WEIGHT_P);
+	inertial_filter_correct(ez, dt, z, 0, WEIGHT_P);
+	float evx = raw_v(0) - x[1];
+	float evy = raw_v(1) - y[1];
+	float evz = raw_v(2) - z[1];
+	inertial_filter_correct(evx, dt, x, 1, WEIGHT_V);
+	inertial_filter_correct(evy, dt, y, 1, WEIGHT_V);
+	inertial_filter_correct(evz, dt, z, 1, WEIGHT_V);
+	pos_b(0) = x[0];
+	vel_b(0) = x[1];
+	pos_b(1) = y[0];
+	vel_b(1) = y[1];
+	pos_b(2) = z[0];
+	vel_b(2) = z[1];
 }
 void positionsetpointCallback(const geometry_msgs::PoseStamped &position_setpoint)
 {
