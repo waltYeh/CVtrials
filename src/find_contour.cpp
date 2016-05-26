@@ -43,8 +43,8 @@ FindContour::FindContour()
 {
 	image_sub = n.subscribe("/ardrone/bottom/image_raw", 1, &FindContour::imageCallback,this);
 	odometry_sub = n.subscribe("/ardrone/odometry", 1, &FindContour::odometryCallback,this);
-	image_pub = n.advertise<ardrone_control::ROI>("/ROI_image", 1);
-	ROI_image_pub = n.advertise<sensor_msgs::Image>("/ROI", 1);
+	image_pub = n.advertise<ardrone_control::ROI>("/ROI", 1);
+	ROI_image_pub = n.advertise<sensor_msgs::Image>("/ROI_image", 1);
 	minarea = 15000;
 	ROI_width = 70;
 	source_image_resized = cvCreateImage(cvSize(640,360),IPL_DEPTH_8U, 3);
@@ -158,6 +158,7 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 		}	
 	}
 	if(count != 0){
+		ROI_msg.header.stamp = ros::Time::now();
 		image_pub.publish(ROI_msg);
 	}
 	

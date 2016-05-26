@@ -4,9 +4,9 @@
 #include "geometry_msgs/PoseStamped.h"
 #include "nav_msgs/Odometry.h"
 #include "std_msgs/Empty.h"
-//#include "Eigen/Dense"
-#include "../include/Eigen/Dense"
+#include "Eigen/Dense"
 #include "ardrone_autonomy/Navdata.h"
+#include "ardrone_control/ROI.h"
 // #include <iostream>
 // #include <conio.h>
 // #include <stdio.h>
@@ -184,6 +184,12 @@ Vector3f pos_sp(0.0,0.0,0.0);
 
 float yaw;
 
+time image_stamp;
+time odometry_stamp;
+// #Two-integer timestamp that is expressed as:
+// # * stamp.sec: seconds (stamp_secs) since epoch (in Python the variable is called 'secs')
+// # * stamp.nsec: nanoseconds since stamp_secs (in Python the variable is called 'nsecs')
+
 void odometryCallback(const nav_msgs::Odometry &odometry)
 {
 	pos_pre(0) = pos(0);
@@ -192,6 +198,7 @@ void odometryCallback(const nav_msgs::Odometry &odometry)
 	pos(0) = odometry.pose.pose.position.x;
 	pos(1) = -odometry.pose.pose.position.y;
 	pos(2) = odometry.pose.pose.position.z;
+	odometry_stamp = odometry.header.stamp;
 	first_pos_received = true;
 }
 void positionsetpointCallback(const geometry_msgs::PoseStamped &position_setpoint)
@@ -199,15 +206,17 @@ void positionsetpointCallback(const geometry_msgs::PoseStamped &position_setpoin
 	pos_sp(0) = position_setpoint.pose.position.x + pos(0);
 	pos_sp(1) = position_setpoint.pose.position.y + pos(1);
 	pos_sp(2) = position_setpoint.pose.position.z + pos(2);
+
 	//the msg provides relative position between one number and the next
 }
 
-void imagepositionCallback(const geometry_msgs::PoseStamped &msg)
+void imagepositionCallback(const ardrone_control::ROI &msg)
 {
 	image_pos_pre(0) = image_pos(0);
 	image_pos_pre(1) = image_pos(1);
-	image_pos(0) = msg.pose.position.x;
-	image_pos(1) = msg.pose.position.y;
+	image_pos(0) = msg.pose1.x;
+	image_pos(1) = msg.pose1.y;
+	image_stamp = msg.header.stamp;
 }
 void navCallback(const ardrone_autonomy::Navdata &msg)
 {
@@ -222,7 +231,7 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;
 	ros::Subscriber pos_sub = n.subscribe("/ardrone/odometry", 1, odometryCallback);
 	ros::Subscriber pos_sp_sub = n.subscribe("/position_setpoint", 1, positionsetpointCallback);
-	ros::Subscriber image_pos_sub = n.subscribe("/image_position", 1, imagepositionCallback);
+	ros::Subscriber image_pos_sub = n.subscribe("/ROI", 1, imagepositionCallback);
 	ros::Subscriber nav_sub = n.subscribe("/ardrone/navdata", 1, navCallback);
 	ros::Publisher cmd_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
 	ros::Publisher takeoff_pub = n.advertise<std_msgs::Empty>("/ardrone/takeoff", 1);
