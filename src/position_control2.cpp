@@ -61,7 +61,16 @@ public:
 	Vector3f pos_b;
 	Vector3f pos_i;
 
+	Vector3f pos_w;
+	ros::Time navdata_stamp;
+	float dt;
+
 	float init_yaw;
+	float yaw;
+
+	ros::Publisher pose_body_pub;
+	ros::Publisher pose_world_pub;
+
 	void R_init(float yaw);
 	void get_R_inert(float yaw);
 	void get_R_body(float yaw);
@@ -72,7 +81,9 @@ public:
 private:
 	ros::NodeHandle n;
 	ros::Subscriber states_sub;
-	void odometryCallback(const nav_msgs::Odometry &odometry);
+	ros::Subscriber nav_sub;
+	//void odometryCallback(const nav_msgs::Odometry &odometry);
+	void navCallback(const ardrone_autonomy::Navdata &msg);
 };
 num_flight::num_flight()
 {
@@ -196,12 +207,17 @@ bool num_flight::altitude_change(const Vector3f& _pos_sp, const Vector3f& _pos, 
 }
 
 
-
-
 States::States()
 {
-	states_sub = n.subscribe("/ardrone/odometry", 1, &States::odometryCallback, this);
-
+	//states_sub = n.subscribe("/ardrone/odometry", 1, &States::odometryCallback, this);
+	nav_sub = n.subscribe("/ardrone/navdata", 1, &States::navCallback,this);
+	pose_body_pub = n.advertise<geometry_msgs::PoseStamped>("/ardrone/position_body", 1);
+	pose_world_pub = n.advertise<geometry_msgs::PoseStamped>("/ardrone/position_world", 1);
+	for(int i=0;i<3;i++){
+		pos_i(i) = 0;
+		pos_b(i) = 0;
+		pos_w(i) = 0;
+	}
 }
 States::~States()
 {
@@ -225,17 +241,17 @@ void States::R_init(float yaw)
 }
 void States::get_R_body(float yaw)
 {
-	float dif_yaw = yaw - init_yaw;
-	R_body(0,0) = cos(dif_yaw);
-	R_body(0,1) = sin(-dif_yaw);
+	R_body(0,0) = cos(yaw);
+	R_body(0,1) = sin(-yaw);
 	R_body(0,1) = 0;
-	R_body(1,0) = sin(dif_yaw);
-	R_body(1,1) = cos(dif_yaw);
+	R_body(1,0) = sin(yaw);
+	R_body(1,1) = cos(yaw);
 	R_body(1,2) = 0;
 	R_body(2,0) = 0;
 	R_body(2,1) = 0;
 	R_body(2,2) = 0;
 }
+
 void States::inertial_filter_predict(float dt, float x[2], float acc)
 {
 	x[0] += x[1] * dt + 0.5 * acc * dt * dt;
@@ -249,85 +265,105 @@ void States::inertial_filter_correct(float e, float dt, float x[2], char i, floa
 		x[1] += w * ewdt;
 	}
 }
-Vector3f pos(0.0,0.0,0.0);
 
-Vector3f image_pos(0.0,0.0,0.0);
-Vector3f image_pos_pre(0.0,0.0,0.0);
-
-Vector3f pos_sp(0.0,0.0,0.0);
-
-float yaw;
-
-ros::Time image_stamp;
-ros::Time odometry_stamp;
 // #Two-integer timestamp that is expressed as:
 // # * stamp.sec: seconds (stamp_secs) since epoch (in Python the variable is called 'secs')
 // # * stamp.nsec: nanoseconds since stamp_secs (in Python the variable is called 'nsecs')
 
-void States::odometryCallback(const nav_msgs::Odometry &odometry)
-{
-	vel_b(0) = odometry.twist.linear.x;
-	vel_b(1) = odometry.twist.linear.y;
-	vel_b(2) = odometry.twist.linear.z;
+// void States::odometryCallback(const nav_msgs::Odometry &odometry)
+// {
 
-	pos(0) = odometry.pose.pose.position.x;
-	pos(1) = -odometry.pose.pose.position.y;
-	pos(2) = odometry.pose.pose.position.z;
-//	odometry_stamp = odometry.header.stamp;
-	odometry_stamp = ros::Time::now();
-	first_pos_received = true;
-}
+// 	pos(0) = odometry.pose.pose.position.x;
+// 	pos(1) = -odometry.pose.pose.position.y;
+// 	pos(2) = odometry.pose.pose.position.z;
+// 	navdata_stamp = odometry.header.stamp;
+// 	navdata_stamp = ros::Time::now();
+// 	first_pos_received = true;
+// }
 void States::navCallback(const ardrone_autonomy::Navdata &msg)
 {
-	Vector3f raw_v = ;
-	Vector3f raw_a = ;
+	geometry_msgs::PoseStamped body_pose;
+	geometry_msgs::PoseStamped world_pose;
+	Vector3f raw_v ;
+	Vector3f raw_a ;
+	static float last_time = 0;
+	raw_v(0) = msg.vx;
+	raw_v(1) = msg.vy;
+	raw_v(2) = msg.vz;
+	raw_a(0) = msg.ax;
+	raw_a(1) = msg.ay;
+	raw_a(2) = msg.az;
+	dt = (msg.tm - last_time)/1000000.0;
+	last_time = msg.tm;
 	acc_b = raw_a;
+	pos_i += raw_v * dt / 1000.0;
+	
+	navdata_stamp = msg.header.stamp;
 
-	pos_i += raw_v * dt;
-
-	yaw = (msg.rotZ+80) / 57.3;
+	yaw = (msg.rotZ) / 57.3;
+	get_R_body(yaw);
 	first_yaw_received = true;
+
+	vel_b = raw_v;
+	pos_b = pos_i;
 //	ROS_INFO("yaw_deg: %f",yaw*57.3);
-	float x[2], y[2], z[2];
-	x[0] = pos_b(0);
-	y[0] = pos_b(1);
-	z[0] = pos_b(2);
-	x[1] = vel_b(0);
-	y[1] = vel_b(1);
-	z[1] = vel_b(2);
+	// float x[2], y[2], z[2];
+	// x[0] = pos_b(0);
+	// y[0] = pos_b(1);
+	// z[0] = pos_b(2);
+	// x[1] = vel_b(0);
+	// y[1] = vel_b(1);
+	// z[1] = vel_b(2);
 
-	inertial_filter_predict(dt, x, acc_b(0));
-	inertial_filter_predict(dt, y, acc_b(1));
-	inertial_filter_predict(dt, z, acc_b(2));
-	float ex = pos_i(0) - x[0];
-	float ey = pos_i(1) - y[0];
-	float ez = pos_i(2) - z[0];
-	#define WEIGHT_P 0.8
-	#define WEIGHT_V 0.8
-	inertial_filter_correct(ex, dt, x, 0, WEIGHT_P);
-	inertial_filter_correct(ey, dt, y, 0, WEIGHT_P);
-	inertial_filter_correct(ez, dt, z, 0, WEIGHT_P);
-	float evx = raw_v(0) - x[1];
-	float evy = raw_v(1) - y[1];
-	float evz = raw_v(2) - z[1];
-	inertial_filter_correct(evx, dt, x, 1, WEIGHT_V);
-	inertial_filter_correct(evy, dt, y, 1, WEIGHT_V);
-	inertial_filter_correct(evz, dt, z, 1, WEIGHT_V);
-	pos_b(0) = x[0];
-	vel_b(0) = x[1];
-	pos_b(1) = y[0];
-	vel_b(1) = y[1];
-	pos_b(2) = z[0];
-	vel_b(2) = z[1];
-}
-void positionsetpointCallback(const geometry_msgs::PoseStamped &position_setpoint)
-{
-	pos_sp(0) = position_setpoint.pose.position.x + pos(0);
-	pos_sp(1) = position_setpoint.pose.position.y + pos(1);
-	pos_sp(2) = position_setpoint.pose.position.z + pos(2);
+	// inertial_filter_predict(dt, x, acc_b(0));
+	// inertial_filter_predict(dt, y, acc_b(1));
+	// inertial_filter_predict(dt, z, acc_b(2));
+	// float ex = pos_i(0) - x[0];
+	// float ey = pos_i(1) - y[0];
+	// float ez = pos_i(2) - z[0];
+	// #define WEIGHT_P 0.8
+	// #define WEIGHT_V 0.8
+	// inertial_filter_correct(ex, dt, x, 0, WEIGHT_P);
+	// inertial_filter_correct(ey, dt, y, 0, WEIGHT_P);
+	// inertial_filter_correct(ez, dt, z, 0, WEIGHT_P);
+	// float evx = raw_v(0) - x[1];
+	// float evy = raw_v(1) - y[1];
+	// float evz = raw_v(2) - z[1];
+	// inertial_filter_correct(evx, dt, x, 1, WEIGHT_V);
+	// inertial_filter_correct(evy, dt, y, 1, WEIGHT_V);
+	// inertial_filter_correct(evz, dt, z, 1, WEIGHT_V);
+	// pos_b(0) = x[0];
+	// vel_b(0) = x[1];
+	// pos_b(1) = y[0];
+	// vel_b(1) = y[1];
+	// pos_b(2) = z[0];
+	// vel_b(2) = z[1];
+	pos_w = R_body * pos_b;
 
-	//the msg provides relative position between one number and the next
+	body_pose.pose.position.x = pos_b(0);
+	body_pose.pose.position.y = pos_b(1);
+	body_pose.pose.position.z = pos_b(2);
+	world_pose.pose.position.x = pos_w(0);
+	world_pose.pose.position.y = pos_w(1);
+	world_pose.pose.position.z = pos_w(2);
+
+	pose_body_pub.publish(body_pose);
+	pose_world_pub.publish(world_pose);
 }
+
+Vector3f image_pos;
+Vector3f image_pos_pre;
+
+ros::Time image_stamp;
+
+// void positionsetpointCallback(const geometry_msgs::PoseStamped &position_setpoint)
+// {
+// 	pos_sp(0) = position_setpoint.pose.position.x + pos(0);
+// 	pos_sp(1) = position_setpoint.pose.position.y + pos(1);
+// 	pos_sp(2) = position_setpoint.pose.position.z + pos(2);
+
+// 	//the msg provides relative position between one number and the next
+// }
 
 void imagepositionCallback(const ardrone_control::ROI &msg)
 {
@@ -342,18 +378,18 @@ void imagepositionCallback(const ardrone_control::ROI &msg)
 int main(int argc, char **argv)
 {
 	int keypress = 0;
-	num_flight flight;
-	States rotate;
+	
 	ros::init(argc, argv, "position_control2");
+	num_flight flight;
+	States state;
 	ros::NodeHandle n;
 //	ros::Subscriber pos_sub = n.subscribe("/ardrone/odometry", 1, odometryCallback);
-	ros::Subscriber pos_sp_sub = n.subscribe("/position_setpoint", 1, positionsetpointCallback);
 	ros::Subscriber image_pos_sub = n.subscribe("/ROI", 1, imagepositionCallback);
-	ros::Subscriber nav_sub = n.subscribe("/ardrone/navdata", 1, navCallback);
 	ros::Publisher cmd_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
 	ros::Publisher takeoff_pub = n.advertise<std_msgs::Empty>("/ardrone/takeoff", 1);
 	ros::Publisher land_pub = n.advertise<std_msgs::Empty>("/ardrone/land", 1);
 	ros::Publisher stop_pub = n.advertise<std_msgs::Empty>("/ardrone/reset", 1);
+	
 	ros::Rate loop_rate(LOOP_RATE);
 	bool isArrived = false;
 	Vector3f vel_sp(0.0, 0.0, 0.0);
@@ -366,8 +402,9 @@ int main(int argc, char **argv)
 	cmd.angular.y = 0.0;
 	cmd.angular.z = 0.0;
 
+
 	flight._state = STATE_INAC;
-	next_pos_sp(2) = pos(2);
+	next_pos_sp(2) = state.pos_w(2);
 	ROS_INFO("started");
 	while(ros::ok() && !first_pos_received){
 		ros::spinOnce();
@@ -378,11 +415,11 @@ int main(int argc, char **argv)
 		loop_rate.sleep();
 	}
 	for(int i=0;i<9;i++){
-		flight._landing_pos(i,0) += pos(0);
-		flight._landing_pos(i,1) += pos(1);
+		flight._landing_pos(i,0) += state.pos_w(0);
+		flight._landing_pos(i,1) += state.pos_w(1);
 
 	}
-	rotate.R_init(yaw);
+	state.R_init(state.yaw);
 	while(ros::ok() && !flight.is_all_num_finished())
 	{
 	//	keypress = kbhit();
@@ -398,9 +435,9 @@ int main(int argc, char **argv)
 				
 				break;
 			case STATE_INAC:
-				isArrived = flight.inaccurate_control(next_pos_sp, pos, vel_sp);
+				isArrived = flight.inaccurate_control(next_pos_sp, state.pos_w, vel_sp);
 				
-				dur = ros::Time::now() - odometry_stamp;
+				dur = ros::Time::now() - state.navdata_stamp;
 				if(dur.toSec() > 0.5){
 					vel_sp(0) = 0;
 					vel_sp(1) = 0;
@@ -408,7 +445,7 @@ int main(int argc, char **argv)
 				}
 				break;
 			case STATE_ACCR:
-				isArrived = flight.accurate_control(image_pos, pos(2), vel_sp);
+				isArrived = flight.accurate_control(image_pos, state.pos_w(2), vel_sp);
 				
 				dur = ros::Time::now() - image_stamp;
 				if(dur.toSec() > 0.5){
@@ -418,7 +455,7 @@ int main(int argc, char **argv)
 				}
 				break;
 			case STATE_ALT:
-				isArrived = flight.altitude_change(next_pos_sp, pos, vel_sp);
+				isArrived = flight.altitude_change(next_pos_sp, state.pos_w, vel_sp);
 				break;
 		}
 		if(isArrived){
@@ -456,12 +493,11 @@ int main(int argc, char **argv)
 		}
 		
 		Vector3f output_vel_sp;
-		rotate.get_R_body(yaw);
-		output_vel_sp = rotate.R_body.transpose() * vel_sp;
+		output_vel_sp = state.R_body.transpose() * vel_sp;
 		cmd.linear.x = output_vel_sp(0);
 		cmd.linear.y = output_vel_sp(1);
 		cmd.linear.z = vel_sp(2);
-		cmd_pub.publish(cmd);
+//		cmd_pub.publish(cmd);
 		ros::spinOnce();
 		loop_rate.sleep();
 		
