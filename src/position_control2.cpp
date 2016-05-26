@@ -184,8 +184,8 @@ Vector3f pos_sp(0.0,0.0,0.0);
 
 float yaw;
 
-time image_stamp;
-time odometry_stamp;
+ros::Time image_stamp;
+ros::Time odometry_stamp;
 // #Two-integer timestamp that is expressed as:
 // # * stamp.sec: seconds (stamp_secs) since epoch (in Python the variable is called 'secs')
 // # * stamp.nsec: nanoseconds since stamp_secs (in Python the variable is called 'nsecs')
