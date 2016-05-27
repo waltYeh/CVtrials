@@ -41,7 +41,7 @@ private:
 
 FindContour::FindContour()
 {
-	image_sub = n.subscribe("/ardrone/bottom/image_raw", 1, &FindContour::imageCallback,this);
+	image_sub = n.subscribe("/ardrone/image_raw", 1, &FindContour::imageCallback,this);
 	odometry_sub = n.subscribe("/ardrone/odometry", 1, &FindContour::odometryCallback,this);
 	image_pub = n.advertise<ardrone_control::ROI>("/ROI", 1);
 	ROI_image_pub = n.advertise<sensor_msgs::Image>("/ROI_image", 1);
@@ -71,6 +71,8 @@ void FindContour::imageCallback(const sensor_msgs::Image &msg)
 
 	cvDilate(image_threshold, image_threshold, myModel, 1);
 	//cvErode(image_threshold, image_threshold, myModel, 1);
+	cvShowImage("Dilate Image", image_threshold);
+	waitKey(1);
 
 	//find the contours
 	CvMemStorage* storage = cvCreateMemStorage(0);  

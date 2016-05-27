@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "image_control");
 	ros::NodeHandle n;
-	ros::Subscriber image_sub = n.subscribe("/ardrone/bottom/image_raw", 1, imageCallback);
+	ros::Subscriber image_sub = n.subscribe("/ardrone/image_raw", 1, imageCallback);
 	ros::Publisher image_pos_pub = n.advertise<geometry_msgs::PoseStamped>("/image_position", 1);
 	ros::Rate loop_rate(20);
 

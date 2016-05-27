@@ -7,15 +7,11 @@
 #include "Eigen/Dense"
 #include "ardrone_autonomy/Navdata.h"
 #include "ardrone_control/ROI.h"
-// #include <iostream>
-// #include <conio.h>
-// #include <stdio.h>
-// #include <stdlib.h>
-#define ESC 0x1b
+
 #define LOOP_RATE 20
 using namespace std;
 using namespace Eigen;
-std_msgs::Empty order;
+
 bool first_pos_received = false;
 bool first_yaw_received = false;
 
@@ -46,7 +42,6 @@ public:
 	bool accurate_control	(const Vector3f& _image_pos, float pos_z, Vector3f& vel_sp);
 	bool altitude_change	(const Vector3f& _pos_sp, const Vector3f& _pos, Vector3f& vel_sp);
 
-//	void general_control();
 private:
 	
 };
@@ -60,18 +55,17 @@ public:
 	Vector3f vel_b;
 	Vector3f pos_b;
 	Vector3f pos_i;
-
 	Vector3f pos_w;
 	ros::Time navdata_stamp;
+	int drone_state;
 	float dt;
-
 	float init_yaw;
 	float yaw;
 
 	ros::Publisher pose_body_pub;
 	ros::Publisher pose_world_pub;
 
-	void R_init(float yaw);
+	void R_init(void);
 	void get_R_inert(float yaw);
 	void get_R_body(float yaw);
 	States();
@@ -82,7 +76,6 @@ private:
 	ros::NodeHandle n;
 	ros::Subscriber states_sub;
 	ros::Subscriber nav_sub;
-	//void odometryCallback(const nav_msgs::Odometry &odometry);
 	void navCallback(const ardrone_autonomy::Navdata &msg);
 };
 num_flight::num_flight()
@@ -93,15 +86,15 @@ num_flight::num_flight()
 		_num_reached[i] = false;
 	_landing_pos.resize(9,2);
 	_landing_pos <<
-	0.0, 0.0,
-	2.0, 0.0,
-	0.0, 0.0,
-	2.0, 0.0,
-	0.0, 0.0,
-	2.0, 0.0,
-	0.0, 0.0,
-	2.0, 0.0,
-	0.0, 0.0;
+	1.85,  -1.75,
+	0.15,  3.2,
+	0.7,   -1.6,
+	1.85,  -1.55,
+	2.95,  2.2,
+	-2.78, 0.6,
+	4.83,  0.0,
+	-0.6,  -2.65,
+	-3.35, 1.05;
 }
 
 num_flight::~num_flight()
@@ -147,15 +140,10 @@ bool num_flight::inaccurate_control(const Vector3f& _pos_sp, const Vector3f& _po
 
 bool num_flight::accurate_control(const Vector3f& image_pos, float pos_z, Vector3f& vel_sp)
 {
-	// Vector3f z_body(0,0,1);
-	// Vector2f pos_corr_m;
-	// float chord_len = pos_z / z_body(2);
-	// pos_corr_m(0) = chord_len * z_body(0);
-	// pos_corr_m(1) = chord_len * z_body(1);
 	static Vector2f err_last;
 	static Vector2f err_int;
 	static bool new_start = true;
-	float P_pos = 0.3, D_pos = 0.02, I_pos = 0.05;
+	float P_pos = 0.0001, D_pos = 0.00005, I_pos = 0;
 	Vector2f vel_sp_2d;
 	Vector2f image_center(320.0,180.0);
 	Vector2f image_pos_2d;
@@ -174,9 +162,14 @@ bool num_flight::accurate_control(const Vector3f& image_pos, float pos_z, Vector
 	vel_sp(0) = -vel_sp_2d(1);
 	vel_sp(1) = -vel_sp_2d(0);
 	vel_sp(2) = 0;
+	if(vel_sp(0)>0.08)vel_sp(0)=0.08;
+	if(vel_sp(0)<-0.08)vel_sp(0)=-0.08;
+	if(vel_sp(1) >0.08)vel_sp(1) =0.08;
+	if(vel_sp(1) <-0.08)vel_sp(1) =-0.08;
+	
 	bool is_arrived;
 	float dist = err.norm();
-	if(dist > 15.0){
+	if(dist > 30.0){
 		is_arrived = false;
 	}
 	else{
@@ -209,7 +202,6 @@ bool num_flight::altitude_change(const Vector3f& _pos_sp, const Vector3f& _pos, 
 
 States::States()
 {
-	//states_sub = n.subscribe("/ardrone/odometry", 1, &States::odometryCallback, this);
 	nav_sub = n.subscribe("/ardrone/navdata", 1, &States::navCallback,this);
 	pose_body_pub = n.advertise<geometry_msgs::PoseStamped>("/ardrone/position_body", 1);
 	pose_world_pub = n.advertise<geometry_msgs::PoseStamped>("/ardrone/position_world", 1);
@@ -234,7 +226,7 @@ void States::get_R_inert(float yaw)
 	R_inert(2,1) = 0;
 	R_inert(2,2) = 0;
 }
-void States::R_init(float yaw)
+void States::R_init(void)
 {
 	init_yaw = -85/57.3;
 	get_R_inert(init_yaw);
@@ -266,20 +258,6 @@ void States::inertial_filter_correct(float e, float dt, float x[2], char i, floa
 	}
 }
 
-// #Two-integer timestamp that is expressed as:
-// # * stamp.sec: seconds (stamp_secs) since epoch (in Python the variable is called 'secs')
-// # * stamp.nsec: nanoseconds since stamp_secs (in Python the variable is called 'nsecs')
-
-// void States::odometryCallback(const nav_msgs::Odometry &odometry)
-// {
-
-// 	pos(0) = odometry.pose.pose.position.x;
-// 	pos(1) = -odometry.pose.pose.position.y;
-// 	pos(2) = odometry.pose.pose.position.z;
-// 	navdata_stamp = odometry.header.stamp;
-// 	navdata_stamp = ros::Time::now();
-// 	first_pos_received = true;
-// }
 void States::navCallback(const ardrone_autonomy::Navdata &msg)
 {
 	geometry_msgs::PoseStamped body_pose;
@@ -349,21 +327,22 @@ void States::navCallback(const ardrone_autonomy::Navdata &msg)
 
 	pose_body_pub.publish(body_pose);
 	pose_world_pub.publish(world_pose);
+
+	// 0: Unknown
+	// 1: Inited
+	// 2: Landed
+	// 3,7: Flying
+	// 4: Hovering
+	// 5: Test (?)
+	// 6: Taking off
+	// 8: Landing
+	// 9: Looping (?)
+	drone_state = msg.state;
 }
 
 Vector3f image_pos;
 Vector3f image_pos_pre;
-
 ros::Time image_stamp;
-
-// void positionsetpointCallback(const geometry_msgs::PoseStamped &position_setpoint)
-// {
-// 	pos_sp(0) = position_setpoint.pose.position.x + pos(0);
-// 	pos_sp(1) = position_setpoint.pose.position.y + pos(1);
-// 	pos_sp(2) = position_setpoint.pose.position.z + pos(2);
-
-// 	//the msg provides relative position between one number and the next
-// }
 
 void imagepositionCallback(const ardrone_control::ROI &msg)
 {
@@ -371,8 +350,9 @@ void imagepositionCallback(const ardrone_control::ROI &msg)
 	image_pos_pre(1) = image_pos(1);
 	image_pos(0) = msg.pose1.x;
 	image_pos(1) = msg.pose1.y;
-//	image_stamp = msg.header.stamp;
 	image_stamp = ros::Time::now();
+	first_pos_received = true;
+
 }
 
 int main(int argc, char **argv)
@@ -383,7 +363,6 @@ int main(int argc, char **argv)
 	num_flight flight;
 	States state;
 	ros::NodeHandle n;
-//	ros::Subscriber pos_sub = n.subscribe("/ardrone/odometry", 1, odometryCallback);
 	ros::Subscriber image_pos_sub = n.subscribe("/ROI", 1, imagepositionCallback);
 	ros::Publisher cmd_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
 	ros::Publisher takeoff_pub = n.advertise<std_msgs::Empty>("/ardrone/takeoff", 1);
@@ -391,9 +370,11 @@ int main(int argc, char **argv)
 	ros::Publisher stop_pub = n.advertise<std_msgs::Empty>("/ardrone/reset", 1);
 	
 	ros::Rate loop_rate(LOOP_RATE);
+
+	std_msgs::Empty order;
 	bool isArrived = false;
 	Vector3f vel_sp(0.0, 0.0, 0.0);
-	Vector3f next_pos_sp(0.0,0.0,0.0);
+	Vector3f next_pos_sp(0.0, 0.0, 0.0);
 	geometry_msgs::Twist cmd;
 	cmd.linear.x = 0.0;
 	cmd.linear.y = 0.0;
@@ -403,7 +384,7 @@ int main(int argc, char **argv)
 	cmd.angular.z = 0.0;
 
 
-	flight._state = STATE_INAC;
+	flight._state = STATE_ACCR;
 	next_pos_sp(2) = state.pos_w(2);
 	ROS_INFO("started");
 	while(ros::ok() && !first_pos_received){
@@ -414,21 +395,18 @@ int main(int argc, char **argv)
 		ros::spinOnce();
 		loop_rate.sleep();
 	}
-	for(int i=0;i<9;i++){
+	for(int i=0; i<9; i++){
 		flight._landing_pos(i,0) += state.pos_w(0);
 		flight._landing_pos(i,1) += state.pos_w(1);
 
 	}
-	state.R_init(state.yaw);
+	state.R_init();
 	while(ros::ok() && !flight.is_all_num_finished())
 	{
-	//	keypress = kbhit();
-		// if(kbhit())
-		// 	break;
-		
 		next_pos_sp(0) = flight._landing_pos(flight._current_target,0);
 		next_pos_sp(1) = flight._landing_pos(flight._current_target,1);
 		ros::Duration dur;
+
 		switch(flight._state){
 			case STATE_IDLE:
 				isArrived = flight.idle_control(vel_sp);
@@ -448,7 +426,7 @@ int main(int argc, char **argv)
 				isArrived = flight.accurate_control(image_pos, state.pos_w(2), vel_sp);
 				
 				dur = ros::Time::now() - image_stamp;
-				if(dur.toSec() > 0.5){
+				if(dur.toSec() > 0.3){
 					vel_sp(0) = 0;
 					vel_sp(1) = 0;
 					vel_sp(2) = 0;
@@ -476,15 +454,26 @@ int main(int argc, char **argv)
 			//	ROS_INFO("State transferred from INACCURATE to ACCURATE\n");
 			}
 			else if(flight._state == STATE_ACCR){
-				flight._num_reached[flight._current_target] = true;
-				flight._current_target++;
-				if(flight._current_target>=9){
-					flight._state = STATE_IDLE;
-				}
-				else{
-					flight._state = STATE_INAC;
-					ROS_INFO("Target %d arrived\nState transferred from ACCURATE to INACCURATE\n", flight._current_target - 1);
-				}
+				vel_sp(0) = 0;
+				vel_sp(1) = 0;
+				vel_sp(2) = 0;
+				cmd.linear.x = 0;
+				cmd.linear.y = 0;
+				cmd.linear.z = 0;
+				cmd.angular.x = 0.0;
+				cmd.angular.y = 0.0;
+				cmd.angular.z = 0.0;
+				cmd_pub.publish(cmd);
+				if(state.drone_state == 4) land_pub.publish(order);
+				// flight._num_reached[flight._current_target] = true;
+				// flight._current_target++;
+				// if(flight._current_target>=9){
+				// 	flight._state = STATE_IDLE;
+				// }
+				// else{
+				// 	flight._state = STATE_INAC;
+				// 	ROS_INFO("Target %d arrived\nState transferred from ACCURATE to INACCURATE\n", flight._current_target - 1);
+				// }
 			}
 			else if(flight._state == STATE_ALT){
 				flight._state = STATE_INAC;
@@ -492,12 +481,12 @@ int main(int argc, char **argv)
 			}
 		}
 		
-		Vector3f output_vel_sp;
-		output_vel_sp = state.R_body.transpose() * vel_sp;
-		cmd.linear.x = output_vel_sp(0);
-		cmd.linear.y = output_vel_sp(1);
+		// Vector3f output_vel_sp;
+		// output_vel_sp = state.R_body.transpose() * vel_sp;
+		cmd.linear.x = vel_sp(0);
+		cmd.linear.y = vel_sp(1);
 		cmd.linear.z = vel_sp(2);
-//		cmd_pub.publish(cmd);
+		cmd_pub.publish(cmd);
 		ros::spinOnce();
 		loop_rate.sleep();
 		
