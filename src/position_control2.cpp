@@ -93,7 +93,7 @@ num_flight::num_flight()
 	Rf(1,2) = 0;
 	Rf(2,0) = 0;
 	Rf(2,1) = 0;
-	Rf(2,2) = 0;
+	Rf(2,2) = 1;
 	Matrix<float, Dynamic, 3> relative_pos_field;
 	relative_pos_field.resize(9,3);
 	Matrix<float, 3, Dynamic> relative_pos_world;
@@ -238,7 +238,7 @@ void States::get_R_body(float yaw)
 	R_body(1,2) = 0;
 	R_body(2,0) = 0;
 	R_body(2,1) = 0;
-	R_body(2,2) = 0;
+	R_body(2,2) = 1;
 }
 
 void States::inertial_filter_predict(float dt, float x[2], float acc)
@@ -378,12 +378,6 @@ int main(int argc, char **argv)
 	Vector3f vel_sp(0.0, 0.0, 0.0);
 	Vector3f next_pos_sp(0.0, 0.0, 0.0);
 	geometry_msgs::Twist cmd;
-	cmd.linear.x = 0.0;
-	cmd.linear.y = 0.0;
-	cmd.linear.z = 0.0;
-	cmd.angular.x = 0.0;
-	cmd.angular.y = 0.0;
-	cmd.angular.z = 0.0;
 
 
 	flight._state = STATE_TAKEOFF;
@@ -399,12 +393,12 @@ int main(int argc, char **argv)
 	{
 		
 		ros::Duration dur;
-
+        isArrived = false;
 		switch(flight._state){
 			case STATE_TAKEOFF:
 				if(state.drone_state == 2)//landed
 					takeoff_pub.publish(order);
-				else if(state.drone_state==3||state.drone_state==7){//flying, takeoff completed
+				else{//flying, takeoff completed
 					
 					next_pos_sp(2) = 2.2;
 					isArrived = flight.altitude_change(next_pos_sp, state.pos_w, vel_sp);
@@ -445,9 +439,8 @@ int main(int argc, char **argv)
 				}
 				break;
 			case STATE_LANDING:
-				if(state.drone_state == 4) //hovering
-					land_pub.publish(order);
-				else if(state.drone_state == 2){//landed
+				land_pub.publish(order);
+				if(state.drone_state == 2){//landed
 					isArrived = true;
 				}
 				break;
@@ -501,7 +494,10 @@ int main(int argc, char **argv)
 					}
 					else{
 						flight._state = STATE_TAKEOFF;
+
 					}
+                    vel_sp(0) = 0;
+                    vel_sp(1) = 0;
 					break;
 			}
 		}
