@@ -405,14 +405,18 @@ int main(int argc, char **argv)
 				if(state.drone_state == 2)//landed
 					takeoff_pub.publish(order);
 				else if(state.drone_state==3||state.drone_state==7){//flying, takeoff completed
-					next_pos_sp(2) = 2.0;
+					
+					next_pos_sp(2) = 2.2;
 					isArrived = flight.altitude_change(next_pos_sp, state.pos_w, vel_sp);
+					vel_sp(0) = 0;
+					vel_sp(1) = 0;
+					
 				}
 				break;
 			case STATE_ACCURATE_AFTER_TAKEOFF:
 				isArrived = flight.accurate_control(image_pos, state.pos_w(2), vel_sp);
 				dur = ros::Time::now() - image_stamp;
-				if(dur.toSec() > 0.3){
+				if(dur.toSec() > 0.5){
 					vel_sp(0) = 0;
 					vel_sp(1) = 0;
 					vel_sp(2) = 0;
@@ -422,17 +426,10 @@ int main(int argc, char **argv)
 				isArrived = flight.idle_control(vel_sp);
 				break;
 			case STATE_INACCURATE:
-				if(flight._current_target == 0){
-					next_pos_sp(0) = flight.relative_landpos_w(flight._current_target,0);
-					next_pos_sp(1) = flight.relative_landpos_w(flight._current_target,1);
-				}
-				else{
-					next_pos_sp(0) = flight.relative_landpos_w(flight._current_target,0)+state.pos_w(0);
-					next_pos_sp(1) = flight.relative_landpos_w(flight._current_target,1)+state.pos_w(1);
-				}
+				
 				isArrived = flight.inaccurate_control(next_pos_sp, state.pos_w, vel_sp);
 				dur = ros::Time::now() - state.navdata_stamp;
-				if(dur.toSec() > 0.3){
+				if(dur.toSec() > 0.5){
 					vel_sp(0) = 0;
 					vel_sp(1) = 0;
 					vel_sp(2) = 0;
@@ -441,7 +438,7 @@ int main(int argc, char **argv)
 			case STATE_ACCURATE_BEFORE_LANDING:
 				isArrived = flight.accurate_control(image_pos, state.pos_w(2), vel_sp);
 				dur = ros::Time::now() - image_stamp;
-				if(dur.toSec() > 0.3){
+				if(dur.toSec() > 0.5){
 					vel_sp(0) = 0;
 					vel_sp(1) = 0;
 					vel_sp(2) = 0;
@@ -470,6 +467,14 @@ int main(int argc, char **argv)
 					vel_sp(1) = 0;
 					vel_sp(2) = 0;
 					flight._state = STATE_INACCURATE;
+					if(flight._current_target == 0){
+						next_pos_sp(0) = flight.relative_landpos_w(flight._current_target,0);
+						next_pos_sp(1) = flight.relative_landpos_w(flight._current_target,1);
+					}
+					else{
+						next_pos_sp(0) = flight.relative_landpos_w(flight._current_target,0)+state.pos_w(0);
+						next_pos_sp(1) = flight.relative_landpos_w(flight._current_target,1)+state.pos_w(1);
+					}
 					break;
 				case STATE_INACCURATE:
 					ROS_INFO("Target %d arrived inaccurately\n", flight._current_target+1);
@@ -482,12 +487,14 @@ int main(int argc, char **argv)
 					}
 					break;
 				case STATE_ACCURATE_BEFORE_LANDING:
+					ROS_INFO("Ready to land\n");
 					vel_sp(0) = 0;
 					vel_sp(1) = 0;
 					vel_sp(2) = 0;
 					flight._state = STATE_LANDING;
 					break;
 				case STATE_LANDING:
+					ROS_INFO("landed\n");
 					flight._current_target++;
 					if(flight._current_target > 8){
 						return 0;
@@ -499,11 +506,21 @@ int main(int argc, char **argv)
 			}
 		}
 		Vector3f vel_sp_b;
-		vel_sp_b = state.R_body.transpose() * vel_sp;
+		if(flight._state == STATE_ACCURATE_BEFORE_LANDING || flight._state == STATE_ACCURATE_AFTER_TAKEOFF){
+			vel_sp_b = vel_sp;
+			vel_sp_b(2)=0;
+		}
+		else if(flight._state == STATE_INACCURATE){
+			vel_sp_b = state.R_body.transpose() * vel_sp;
+			vel_sp_b(2)=0;
+		}
+		else{
+			vel_sp_b = state.R_body.transpose() * vel_sp;
+		}
 //		ROS_INFO("\nvel_body(%f,%f)",vel_sp_b(0),vel_sp_b(1));
 		cmd.linear.x = vel_sp_b(0);
 		cmd.linear.y = vel_sp_b(1);
-		cmd.linear.z = vel_sp(2);
+		cmd.linear.z = vel_sp_b(2);
 		cmd_pub.publish(cmd);
 		ros::spinOnce();
 		loop_rate.sleep();
