@@ -36,7 +36,7 @@ class num_flight
 public:
 	unsigned char _state;//idle, or inaccurate pos_ctrl, or accurate image_ctrl
 	bool _num_reached[9];
-	Matrix<float, Dynamic, 2> _landing_pos;
+	Matrix<float, Dynamic, 2> relative_landpos_w;
 	unsigned char _current_target;
 	num_flight();
 	~num_flight();
@@ -53,7 +53,7 @@ private:
 class States
 {
 public:
-	Matrix<float, 3, 3> R_inert;
+	Matrix<float, 3, 3> R_field;
 	Matrix<float, 3, 3> R_body;
 	
 	Vector3f acc_b;
@@ -71,8 +71,8 @@ public:
 	ros::Publisher pose_body_pub;
 	ros::Publisher pose_world_pub;
 
-	void R_init(float yaw);
-	void get_R_inert(float yaw);
+	void R_init(void);
+	void get_R_field(float yaw);
 	void get_R_body(float yaw);
 	States();
 	~States();
@@ -87,21 +87,42 @@ private:
 };
 num_flight::num_flight()
 {
+	Matrix<float, 3, 3> Rf;
+	float world_field_yaw = -85/57.3;
+	Rf(0,0) = cos(world_field_yaw);
+	Rf(0,1) = sin(-world_field_yaw);
+	Rf(0,2) = 0;
+	Rf(1,0) = sin(world_field_yaw);
+	Rf(1,1) = cos(world_field_yaw);
+	Rf(1,2) = 0;
+	Rf(2,0) = 0;
+	Rf(2,1) = 0;
+	Rf(2,2) = 0;
+	Matrix<float, Dynamic, 3> relative_pos_field;
+	relative_pos_field.resize(9,3);
+	Matrix<float, 3, Dynamic> relative_pos_world;
+	relative_pos_world.resize(3,9);
+	relative_pos_field<<
+	1.85, -1.75,0,
+	0.15,3.2,0,
+	0.7,-1.6,0,
+	1.85,-1.55,0,
+	2.95,2.2,0,
+	-2.78,0.8,0,
+	4.83,0.0,0,
+	-0.6,-2.65,0,
+	-3.35,1.05,0;
+
 	_state = STATE_IDLE;
 	_current_target=0;
 	for(int i = 0; i < 9; i++)
 		_num_reached[i] = false;
-	_landing_pos.resize(9,2);
-	_landing_pos <<
-	0.0, 0.0,
-	2.0, 0.0,
-	0.0, 0.0,
-	2.0, 0.0,
-	0.0, 0.0,
-	2.0, 0.0,
-	0.0, 0.0,
-	2.0, 0.0,
-	0.0, 0.0;
+	relative_pos_world = Rf*relative_pos_field.transpose();
+	relative_landpos_w.resize(9,2);
+	for(int i = 0; i < 9; i++){
+		relative_landpos_w(i,0) = relative_pos_world(0,i);
+		relative_landpos_w(i,1) = relative_pos_world(1,i);
+	}
 }
 
 num_flight::~num_flight()
@@ -132,12 +153,12 @@ bool num_flight::inaccurate_control(const Vector3f& _pos_sp, const Vector3f& _po
 	Vector3f err = _pos_sp - _pos;
 	err(2) = 0;
 	float dist = err.norm();
-	if(dist > 0.8){
+	if(dist > 0.3){
 		Vector3f direction = err / dist;
 		vel_sp = direction * speed;
 
 		is_arrived = false;
-		ROS_INFO("\npos(%f, %f)\nsetpt(%f, %f)\nvelsp(%f, %f)\n",_pos(0),_pos(1),_pos_sp(0),_pos_sp(1),vel_sp(0),vel_sp(1));
+	//	ROS_INFO("\npos(%f, %f)\nsetpt(%f, %f)\nvelsp(%f, %f)\n",_pos(0),_pos(1),_pos_sp(0),_pos_sp(1),vel_sp(0),vel_sp(1));
 	}
 	else{
 		is_arrived = true;
@@ -222,28 +243,28 @@ States::States()
 States::~States()
 {
 }
-void States::get_R_inert(float yaw)
+void States::get_R_field(float yaw)
 {
-	R_inert(0,0) = cos(yaw);
-	R_inert(0,1) = sin(yaw);
-	R_inert(0,1) = 0;
-	R_inert(1,0) = sin(-yaw);
-	R_inert(1,1) = cos(yaw);
-	R_inert(1,2) = 0;
-	R_inert(2,0) = 0;
-	R_inert(2,1) = 0;
-	R_inert(2,2) = 0;
+	R_field(0,0) = cos(yaw);
+	R_field(0,1) = sin(-yaw);
+	R_field(0,2) = 0;
+	R_field(1,0) = sin(yaw);
+	R_field(1,1) = cos(yaw);
+	R_field(1,2) = 0;
+	R_field(2,0) = 0;
+	R_field(2,1) = 0;
+	R_field(2,2) = 0;
 }
-void States::R_init(float yaw)
+void States::R_init(void)
 {
 	init_yaw = -85/57.3;
-	get_R_inert(init_yaw);
+	get_R_field(init_yaw);
 }
 void States::get_R_body(float yaw)
 {
 	R_body(0,0) = cos(yaw);
 	R_body(0,1) = sin(-yaw);
-	R_body(0,1) = 0;
+	R_body(0,2) = 0;
 	R_body(1,0) = sin(yaw);
 	R_body(1,1) = cos(yaw);
 	R_body(1,2) = 0;
@@ -406,28 +427,30 @@ int main(int argc, char **argv)
 	flight._state = STATE_INAC;
 	next_pos_sp(2) = state.pos_w(2);
 	ROS_INFO("started");
-	while(ros::ok() && !first_pos_received){
-		ros::spinOnce();
-		loop_rate.sleep();
-	}
+
 	while(ros::ok() && !first_yaw_received){
 		ros::spinOnce();
 		loop_rate.sleep();
 	}
-	for(int i=0;i<9;i++){
-		flight._landing_pos(i,0) += state.pos_w(0);
-		flight._landing_pos(i,1) += state.pos_w(1);
+	// for(int i=0;i<9;i++){
+	// 	flight.relative_landpos_w(i,0) += state.pos_w(0);
+	// 	flight.relative_landpos_w(i,1) += state.pos_w(1);
 
-	}
-	state.R_init(state.yaw);
+	// }
+	
 	while(ros::ok() && !flight.is_all_num_finished())
 	{
 	//	keypress = kbhit();
 		// if(kbhit())
 		// 	break;
-		
-		next_pos_sp(0) = flight._landing_pos(flight._current_target,0);
-		next_pos_sp(1) = flight._landing_pos(flight._current_target,1);
+		if(flight._current_target == 0){
+			next_pos_sp(0) = flight.relative_landpos_w(flight._current_target,0);
+			next_pos_sp(1) = flight.relative_landpos_w(flight._current_target,1);
+		}
+		else{
+			next_pos_sp(0) = flight.relative_landpos_w(flight._current_target,0)+state.pos_w(0);
+			next_pos_sp(1) = flight.relative_landpos_w(flight._current_target,1)+state.pos_w(1);
+		}
 		ros::Duration dur;
 		switch(flight._state){
 			case STATE_IDLE:
@@ -461,6 +484,7 @@ int main(int argc, char **argv)
 		if(isArrived){
 			if(flight._state == STATE_INAC){
 				flight._num_reached[flight._current_target] = true;
+				ROS_INFO("Target %d arrived\n", flight._current_target+1);
 				flight._current_target++;
 				vel_sp(0)=0;
 				vel_sp(1)=0;
@@ -470,20 +494,20 @@ int main(int argc, char **argv)
 				}
 				else{
 					flight._state = STATE_INAC;
-					ROS_INFO("Target %d arrived\nState transferred from ACCURATE to INACCURATE\n", flight._current_target - 1);
+					ROS_INFO("State transferred from INACCURATE to ACCURATE\n");
 				}
 			//	flight._state = STATE_ACCR;
 			//	ROS_INFO("State transferred from INACCURATE to ACCURATE\n");
 			}
 			else if(flight._state == STATE_ACCR){
 				flight._num_reached[flight._current_target] = true;
-				flight._current_target++;
+			//	flight._current_target++;//this either added in inacc or in acc not twice
 				if(flight._current_target>=9){
 					flight._state = STATE_IDLE;
 				}
 				else{
 					flight._state = STATE_INAC;
-					ROS_INFO("Target %d arrived\nState transferred from ACCURATE to INACCURATE\n", flight._current_target - 1);
+					ROS_INFO("Target %d arrived\nState transferred from ACCURATE to INACCURATE\n", flight._current_target);
 				}
 			}
 			else if(flight._state == STATE_ALT){
@@ -494,10 +518,11 @@ int main(int argc, char **argv)
 		
 		Vector3f output_vel_sp;
 		output_vel_sp = state.R_body.transpose() * vel_sp;
+//		ROS_INFO("\nvel_body(%f,%f)",output_vel_sp(0),output_vel_sp(1));
 		cmd.linear.x = output_vel_sp(0);
 		cmd.linear.y = output_vel_sp(1);
 		cmd.linear.z = vel_sp(2);
-//		cmd_pub.publish(cmd);
+		cmd_pub.publish(cmd);
 		ros::spinOnce();
 		loop_rate.sleep();
 		
