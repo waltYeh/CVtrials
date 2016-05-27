@@ -520,7 +520,7 @@ int main(int argc, char **argv)
 //		ROS_INFO("\nvel_body(%f,%f)",vel_sp_b(0),vel_sp_b(1));
 		cmd.linear.x = vel_sp_b(0);
 		cmd.linear.y = vel_sp_b(1);
-		cmd.linear.z = vel_sp_b(2);
+		cmd.linear.z = vel_sp(2);
 		cmd_pub.publish(cmd);
 		ros::spinOnce();
 		loop_rate.sleep();
