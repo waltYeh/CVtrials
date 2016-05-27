@@ -26,17 +26,19 @@ float absolute_f(float a){return (a>0?a:-a);}
 class num_flight
 {
 	#define STATE_IDLE 0
-	#define STATE_INAC 1
-	#define STATE_ACCR 2
-	#define STATE_ALT 3
+	#define STATE_TAKEOFF 1
+	#define STATE_ACCURATE_AFTER_TAKEOFF 2
+	#define STATE_INACCURATE 3
+	#define STATE_ACCURATE_BEFORE_LANDING 4
+	#define STATE_LANDING 5
+	#define STATE_ON_GROUND 6
+	#define STATE_ALT 7
 public:
 	unsigned char _state;//idle, or inaccurate pos_ctrl, or accurate image_ctrl
-	bool _num_reached[9];
 	Matrix<float, Dynamic, 2> relative_landpos_w;
 	unsigned char _current_target;
 	num_flight();
 	~num_flight();
-	bool is_all_num_finished();
 	bool idle_control		(Vector3f& vel_sp);
 	bool inaccurate_control	(const Vector3f& _pos_sp, const Vector3f& _pos, Vector3f& vel_sp);
 	bool accurate_control	(const Vector3f& _image_pos, float pos_z, Vector3f& vel_sp);
@@ -74,7 +76,9 @@ private:
 	ros::NodeHandle n;
 	ros::Subscriber states_sub;
 	ros::Subscriber nav_sub;
+	ros::Subscriber odometry_sub;
 	void navCallback(const ardrone_autonomy::Navdata &msg);
+	void odometryCallback(const nav_msgs::Odometry &msg);
 };
 
 num_flight::num_flight()
@@ -107,8 +111,6 @@ num_flight::num_flight()
 
 	_state = STATE_IDLE;
 	_current_target=0;
-	for(int i = 0; i < 9; i++)
-		_num_reached[i] = false;
 	relative_pos_world = Rf*relative_pos_field.transpose();
 	relative_landpos_w.resize(9,2);
 	for(int i = 0; i < 9; i++){
@@ -119,16 +121,6 @@ num_flight::num_flight()
 
 num_flight::~num_flight()
 {
-}
-
-bool num_flight::is_all_num_finished(void)
-{
-	for(int i = 0; i < 9; i++){
-		if(_num_reached[i] == false){//if not reached
-			return false;
-		}
-	}
-	return true;
 }
 
 bool num_flight::idle_control(Vector3f& vel_sp)
@@ -223,6 +215,7 @@ bool num_flight::altitude_change(const Vector3f& _pos_sp, const Vector3f& _pos, 
 States::States()
 {
 	nav_sub = n.subscribe("/ardrone/navdata", 1, &States::navCallback,this);
+	odometry_sub = n.subscribe("/ardrone/odometry", 1, &States::odometryCallback,this);
 	pose_body_pub = n.advertise<geometry_msgs::PoseStamped>("/ardrone/position_body", 1);
 	pose_world_pub = n.advertise<geometry_msgs::PoseStamped>("/ardrone/position_world", 1);
 	for(int i=0;i<3;i++){
@@ -344,6 +337,11 @@ void States::navCallback(const ardrone_autonomy::Navdata &msg)
 	drone_state = msg.state;
 }
 
+void States::odometryCallback(const nav_msgs::Odometry &msg)
+{
+	pos_w(2) = msg.pose.pose.position.z;
+}
+
 Vector3f image_pos;
 Vector3f image_pos_pre;
 ros::Time image_stamp;
@@ -388,8 +386,8 @@ int main(int argc, char **argv)
 	cmd.angular.z = 0.0;
 
 
-	flight._state = STATE_ACCR;
-	next_pos_sp(2) = state.pos_w(2);
+	flight._state = STATE_TAKEOFF;
+//	next_pos_sp(2) = state.pos_w(2);
 	ROS_INFO("started");
 
 	while(ros::ok() && !first_yaw_received){
@@ -397,32 +395,21 @@ int main(int argc, char **argv)
 		loop_rate.sleep();
 	}
 	
-	while(ros::ok() && !flight.is_all_num_finished())
+	while(ros::ok())
 	{
-		if(flight._current_target == 0){
-			next_pos_sp(0) = flight.relative_landpos_w(flight._current_target,0);
-			next_pos_sp(1) = flight.relative_landpos_w(flight._current_target,1);
-		}
-		else{
-			next_pos_sp(0) = flight.relative_landpos_w(flight._current_target,0)+state.pos_w(0);
-			next_pos_sp(1) = flight.relative_landpos_w(flight._current_target,1)+state.pos_w(1);
-		}
+		
 		ros::Duration dur;
 
 		switch(flight._state){
-			case STATE_IDLE:
-				isArrived = flight.idle_control(vel_sp);
-				break;
-			case STATE_INAC:
-				isArrived = flight.inaccurate_control(next_pos_sp, state.pos_w, vel_sp);
-				dur = ros::Time::now() - state.navdata_stamp;
-				if(dur.toSec() > 0.3){
-					vel_sp(0) = 0;
-					vel_sp(1) = 0;
-					vel_sp(2) = 0;
+			case STATE_TAKEOFF:
+				if(state.drone_state == 2)//landed
+					takeoff_pub.publish(order);
+				else if(state.drone_state==3||state.drone_state==7){//flying, takeoff completed
+					next_pos_sp(2) = 2.0;
+					isArrived = flight.altitude_change(next_pos_sp, state.pos_w, vel_sp);
 				}
 				break;
-			case STATE_ACCR:
+			case STATE_ACCURATE_AFTER_TAKEOFF:
 				isArrived = flight.accurate_control(image_pos, state.pos_w(2), vel_sp);
 				dur = ros::Time::now() - image_stamp;
 				if(dur.toSec() > 0.3){
@@ -431,60 +418,91 @@ int main(int argc, char **argv)
 					vel_sp(2) = 0;
 				}
 				break;
+			case STATE_IDLE:
+				isArrived = flight.idle_control(vel_sp);
+				break;
+			case STATE_INACCURATE:
+				if(flight._current_target == 0){
+					next_pos_sp(0) = flight.relative_landpos_w(flight._current_target,0);
+					next_pos_sp(1) = flight.relative_landpos_w(flight._current_target,1);
+				}
+				else{
+					next_pos_sp(0) = flight.relative_landpos_w(flight._current_target,0)+state.pos_w(0);
+					next_pos_sp(1) = flight.relative_landpos_w(flight._current_target,1)+state.pos_w(1);
+				}
+				isArrived = flight.inaccurate_control(next_pos_sp, state.pos_w, vel_sp);
+				dur = ros::Time::now() - state.navdata_stamp;
+				if(dur.toSec() > 0.3){
+					vel_sp(0) = 0;
+					vel_sp(1) = 0;
+					vel_sp(2) = 0;
+				}
+				break;
+			case STATE_ACCURATE_BEFORE_LANDING:
+				isArrived = flight.accurate_control(image_pos, state.pos_w(2), vel_sp);
+				dur = ros::Time::now() - image_stamp;
+				if(dur.toSec() > 0.3){
+					vel_sp(0) = 0;
+					vel_sp(1) = 0;
+					vel_sp(2) = 0;
+				}
+				break;
+			case STATE_LANDING:
+				if(state.drone_state == 4) //hovering
+					land_pub.publish(order);
+				else if(state.drone_state == 2){//landed
+					isArrived = true;
+				}
+				break;
 			case STATE_ALT:
 				isArrived = flight.altitude_change(next_pos_sp, state.pos_w, vel_sp);
 				break;
 		}
 		if(isArrived){
-			if(flight._state == STATE_INAC){
-				flight._num_reached[flight._current_target] = true;
-				ROS_INFO("Target %d arrived\n", flight._current_target+1);
-			//	flight._current_target++;
-				vel_sp(0)=0;
-				vel_sp(1)=0;
-				vel_sp(2)=0;
-				if(flight._current_target>=9){
-					flight._state = STATE_IDLE;
-				}
-				else{
-					flight._state = STATE_INAC;
-					ROS_INFO("State transferred from INACCURATE to ACCURATE\n");
-				}
-			//	flight._state = STATE_ACCR;
-			//	ROS_INFO("State transferred from INACCURATE to ACCURATE\n");
-			}
-			else if(flight._state == STATE_ACCR){
-				vel_sp(0) = 0;
-				vel_sp(1) = 0;
-				vel_sp(2) = 0;
-				cmd.linear.x = 0;
-				cmd.linear.y = 0;
-				cmd.linear.z = 0;
-				cmd.angular.x = 0.0;
-				cmd.angular.y = 0.0;
-				cmd.angular.z = 0.0;
-				cmd_pub.publish(cmd);
-				if(state.drone_state == 4) land_pub.publish(order);
-				// flight._num_reached[flight._current_target] = true;
-				// flight._current_target++;
-				// if(flight._current_target>=9){
-				// 	flight._state = STATE_IDLE;
-				// }
-				// else{
-				// 	flight._state = STATE_INAC;
-				// 	ROS_INFO("Target %d arrived\nState transferred from ACCURATE to INACCURATE\n", flight._current_target - 1);
-				// }
-			}
-			else if(flight._state == STATE_ALT){
-				flight._state = STATE_INAC;
-				ROS_INFO("New altitude arrived\nState transferred from ALT to INACCURATE\n");
+			switch(flight._state){
+				case STATE_TAKEOFF:
+					ROS_INFO("takeoff finished\n");
+					flight._state = STATE_ACCURATE_AFTER_TAKEOFF;
+					break;
+				case STATE_ACCURATE_AFTER_TAKEOFF:
+					ROS_INFO("accurate arrived after takeoff\n");
+					vel_sp(0) = 0;
+					vel_sp(1) = 0;
+					vel_sp(2) = 0;
+					flight._state = STATE_INACCURATE;
+					break;
+				case STATE_INACCURATE:
+					ROS_INFO("Target %d arrived inaccurately\n", flight._current_target+1);
+				//	flight._current_target++;
+					vel_sp(0)=0;
+					vel_sp(1)=0;
+					vel_sp(2)=0;
+					if(flight._current_target<9){
+						flight._state = STATE_ACCURATE_BEFORE_LANDING;
+					}
+					break;
+				case STATE_ACCURATE_BEFORE_LANDING:
+					vel_sp(0) = 0;
+					vel_sp(1) = 0;
+					vel_sp(2) = 0;
+					flight._state = STATE_LANDING;
+					break;
+				case STATE_LANDING:
+					flight._current_target++;
+					if(flight._current_target > 8){
+						return 0;
+					}
+					else{
+						flight._state = STATE_TAKEOFF;
+					}
+					break;
 			}
 		}
-		Vector3f output_vel_sp;
-		output_vel_sp = state.R_body.transpose() * vel_sp;
-//		ROS_INFO("\nvel_body(%f,%f)",output_vel_sp(0),output_vel_sp(1));
-		cmd.linear.x = output_vel_sp(0);
-		cmd.linear.y = output_vel_sp(1);
+		Vector3f vel_sp_b;
+		vel_sp_b = state.R_body.transpose() * vel_sp;
+//		ROS_INFO("\nvel_body(%f,%f)",vel_sp_b(0),vel_sp_b(1));
+		cmd.linear.x = vel_sp_b(0);
+		cmd.linear.y = vel_sp_b(1);
 		cmd.linear.z = vel_sp(2);
 		cmd_pub.publish(cmd);
 		ros::spinOnce();
