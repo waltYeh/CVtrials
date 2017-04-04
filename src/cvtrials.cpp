@@ -9,11 +9,12 @@ using namespace cv;
 
 int main(int argc, char **argv)
 {
-	IplImage* imgA=cvLoadImage("image0.jpg",CV_LOAD_IMAGE_GRAYSCALE);
-	IplImage* imgB=cvLoadImage("image1.jpg",CV_LOAD_IMAGE_GRAYSCALE);
+	IplImage* imgA=cvLoadImage(argv[1],CV_LOAD_IMAGE_GRAYSCALE);
+	IplImage* imgB=cvLoadImage(argv[2],CV_LOAD_IMAGE_GRAYSCALE);
 	CvSize img_sz = cvGetSize(imgA);
 	int win_size = 10;
-	IplImage* imgC = cvLoadImage("../Data/OpticalFlow1.jpg",CV_LOAD_IMAGE_UNCHANGED);
+	IplImage* imgC = cvLoadImage(argv[2],CV_LOAD_IMAGE_UNCHANGED);
+	IplImage* imgD = cvLoadImage(argv[1],CV_LOAD_IMAGE_UNCHANGED);
 	IplImage* eig_image = cvCreateImage(img_sz,IPL_DEPTH_32F,1);
 	IplImage* tmp_image = cvCreateImage(img_sz,IPL_DEPTH_32F,1);
 	int corner_count = MAX_CORNERS;
@@ -36,7 +37,7 @@ int main(int argc, char **argv)
 		CvPoint p0=cvPoint(cvRound(cornersA[i].x),cvRound(cornersA[i].y));
 		CvPoint p1=cvPoint(cvRound(cornersB[i].x),cvRound(cornersB[i].y));
 		cvLine(imgC,p0,p1,CV_RGB(255,0,0),2);
-
+		cvLine(imgD,p0,p1,CV_RGB(255,0,0),2);
 	}
 	cvNamedWindow("ImageA",0);
 	cvNamedWindow("ImageB",0);
@@ -44,6 +45,7 @@ int main(int argc, char **argv)
 	cvShowImage("ImageA",imgA);
 	cvShowImage("ImageB",imgB);
 	cvShowImage("LKpyr_OpticalFlow",imgC);
+	cvShowImage("LKpyr_OpticalFlow2",imgD);
 	waitKey(0);
 	return 0;
 	#if 0	
