@@ -49,13 +49,10 @@ target_link_libraries(image_control
   ${OpenCV_LIBS}
 )
 
-add_executable(cvtrials 
-  src/cvtrials.cpp
-)
-target_link_libraries(cvtrials
-  ${catkin_LIBRARIES}
-  ${OpenCV_LIBS}
-)
+
+
+
+
 
 
 ## Mark executable scripts (Python etc.) for installation
